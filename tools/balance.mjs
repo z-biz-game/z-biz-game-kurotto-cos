@@ -1,7 +1,7 @@
 // 难度与成本的实测台架：菜单是一个承诺，不是一行文案。
 // 用法：node tools/balance.mjs [样本数]   （或 SAMPLES=<n>，CI 用 SAMPLES=20）
-// 红线逐条：B1 成本 · B2 出盘率 · B3/B3b 阶梯 · B4 铅笔不说谎 · B5/B5b 页面数字 · B6/B6-guard 规则覆盖。
-import { makePuzzle, TIERS, BUDGET } from '../js/engine/generate.js';
+// 红线逐条：B1 成本 · B2 出盘率 · B3/B3b 阶梯 · B4 铅笔不说谎 · B5/B5b 页面数字 · B6/B6-guard 规则覆盖 · B7 排除档位的理由今天还成立。
+import { makePuzzle, TIERS, EXCLUDED_TIERS, BUDGET } from '../js/engine/generate.js';
 import { countSolutions, countSolutionsDumb, isCircle, isNum, FREE } from '../js/engine/rules.js';
 import { solve, RULES } from '../js/engine/pencil.js';
 import { mulberry32 } from '../js/engine/rng.js';
@@ -19,7 +19,7 @@ const med = a => pct(a, 0.5);
 console.log(`菜单五档 × ${N} 张（seed 从 5000 起，逐张递增，可复跑）`);
 const rows = [];
 for (const t of TIERS) {
-  const ms = [], rounds = [], clues = [], nodes = [], shippedRound = [];
+  const ms = [], rounds = [], clues = [], nodes = [], totNodes = [], shippedRound = [];
   const firedBoards = new Map(RULES.map(r => [r, 0]));
   let ship = 0;
   for (let s = 0; s < N; s++) {
@@ -28,14 +28,14 @@ for (const t of TIERS) {
     if (pz.fail) continue;
     ship++;
     ms.push(Date.now() - t0);
-    rounds.push(pz.rounds); clues.push(pz.clues); nodes.push(pz.maxNodes);
+    rounds.push(pz.rounds); clues.push(pz.clues); nodes.push(pz.maxNodes); totNodes.push(pz.nodes);
     shippedRound.push(pz.rounds);
     for (const r of RULES) if (pz.fired[r] > 0) firedBoards.set(r, firedBoards.get(r) + 1);
   }
   const p95Ms = pct(ms, 0.95), p10R = pct(shippedRound, 0.1), p95R = pct(shippedRound, 0.95);
   rows.push({ n: t.n, label: t.label, ship, rate: ship / N, medMs: med(ms), p95Ms, medClues: med(clues),
     medRounds: med(rounds), p10Rounds: p10R, p95Rounds: p95R, maxRounds: Math.max(...rounds), minRounds: Math.min(...rounds),
-    maxNodes: Math.max(0, ...nodes), firedBoards });
+    maxNodes: Math.max(0, ...nodes), medNodes: med(totNodes), firedBoards });
   console.log(`  ${t.name} ${t.label}：出货 ${ship}/${N} = ${(100 * ship / N).toFixed(0)}% · 线索 med ${med(clues)} · 链长 med ${med(rounds)} 轮 全距 ${Math.min(...rounds)}–${Math.max(...rounds)} p95 ${p95R} 轮 · 每张 med ${med(ms)} ms p95 ${p95Ms} ms · 唯一性节点 max ${Math.max(0, ...nodes)} · 开火覆盖 ${RULES.map(r => `${r.slice(0, 2)}=${firedBoards.get(r)}`).join(' ')}`);
 }
 
@@ -95,18 +95,41 @@ for (const r of rows) {
 }
 line(RULES.length === 6, 'B6-guard', `规则表 ${RULES.length} 条，与 README 的六条一致`);
 
-// 观测：12×12 / 14×14 不在菜单里，这里只报读数不设红线（未来的通过不该把闸弄红）。
-console.log('观测：请出菜单的档位（不参与红线）');
-for (const n of [12, 14]) {
-  let ship = 0, cut = 0, clues = [], ms = [], rounds = [];
-  const K = Math.max(3, N >> 2);
-  for (let s = 0; s < K; s++) {
+// 请出菜单的档位：排除的理由必须是**现在还在成立**的理由，否则那句"为什么不在菜单里"就成了
+// 历史读数。这里量的四件事（链长 med、线索 med、挖预算被掐的盘数、出题节点 med）都只由
+// seed 与节点预算决定，换一台机器是同一个数，所以逐条写死等式；耗时只卡方向（同 B5b）。
+// 样本数固定 5 张、seed 与 TIERS 那批同一条流：不跟 SAMPLES 漂，否则文档里的数没有分母。
+const EX_N = 5;
+console.log('对账：请出菜单的档位（B7 逐条核对页面理由里的读数）');
+for (const x of EXCLUDED_TIERS) {
+  let ship = 0, cut = 0, clues = [], ms = [], rounds = [], totNodes = [];
+  for (let s = 0; s < EX_N; s++) {
     const t0 = Date.now();
-    const pz = makePuzzle(n, mulberry32(5000 + s * 7919 + n), BUDGET);
+    const pz = makePuzzle(x.n, mulberry32(5000 + s * 7919 + x.n), BUDGET);
     if (pz.fail) continue;
-    ship++; cut += pz.digStopped > 0 ? 1 : 0; clues.push(pz.clues); ms.push(Date.now() - t0); rounds.push(pz.rounds);
+    ship++; cut += pz.digStopped > 0 ? 1 : 0; clues.push(pz.clues); ms.push(Date.now() - t0);
+    rounds.push(pz.rounds); totNodes.push(pz.nodes);
   }
-  console.log(`  ${n}×${n}：出货 ${ship}/${K} · 挖预算被掐 ${cut}/${K} · 线索 med ${med(clues)}/${n * n} · 链长 med ${med(rounds)} 轮 · 每张 med ${med(ms)} ms`);
+  const mr = med(rounds), mc = med(clues), mm = med(ms), mn = med(totNodes), p95 = pct(ms, 0.95);
+  console.log(`  ${x.n}×${x.n}：出货 ${ship}/${EX_N} · 挖预算被掐 ${cut}/${EX_N} · 线索 med ${mc}/${x.n * x.n} · 链长 med ${mr} 轮 · 出题节点 med ${mn} · 每张 med ${mm} ms p95 ${p95} ms（ms 只进方向线，不进页面文案）`);
+  if (!x.obs) { line(false, 'B7', `${x.n}×${x.n} 没有带 obs：请出菜单的理由没登记读数，就没人能核对它`); continue; }
+  line(ship === EX_N, 'B7', `${x.n}×${x.n} 样本 ${ship}/${EX_N} 张都出得来（出不了盘的档位谈不上"排除理由成立"）`);
+  line(x.obs.samples === EX_N, 'B7', `${x.n}×${x.n} obs 的分母 ${x.obs.samples} = 这一段的固定样本 ${EX_N}`);
+  line(x.obs.rounds === mr, 'B7', `${x.n}×${x.n} 链长 med 文案写 ${x.obs.rounds} · 实测 ${mr}`);
+  line(x.obs.clues === mc && x.obs.cells === x.n * x.n, 'B7', `${x.n}×${x.n} 线索 med 文案写 ${x.obs.clues}/${x.obs.cells} · 实测 ${mc}/${x.n * x.n}`);
+  line(x.obs.cut === cut, 'B7', `${x.n}×${x.n} 挖预算被掐的盘数 文案写 ${x.obs.cut} · 实测 ${cut}`);
+  line(x.obs.nodes === mn, 'B7', `${x.n}×${x.n} 出题节点 med 文案写 ${x.obs.nodes} · 实测 ${mn}`);
+  // 下面这些是"排除"这件事本身的理由，全部量自这一次实测：
+  // 深度没买到东西（链长只多 1–2 轮）、题面反而更厚（线索密度不降）、成本确实在涨（节点不减、等待变长）。
+  // 等待只卡方向、不卡倍数：ms 是这台机器的速度，写成绝对线就会随负载变红（B5b 同一条纪律）。
+  line(mr <= last.medRounds + 2, 'B7', `${x.n}×${x.n} 链长 med ${mr} ≤ 末档 ${last.medRounds} + 2（更大的盘买不到更长的推理）`);
+  line(mc / (x.n * x.n) >= last.medClues / (last.n * last.n), 'B7',
+    `${x.n}×${x.n} 线索密度 ${(100 * mc / (x.n * x.n)).toFixed(1)}% ≥ 末档 ${(100 * last.medClues / (last.n * last.n)).toFixed(1)}%（挖不开，出的是厚线索盘）`);
+  line(mn >= last.medNodes, 'B7', `${x.n}×${x.n} 出题节点 med ${mn} ≥ 末档 ${last.medNodes}（成本这一头只涨不缩）`);
+  line(mm > last.medMs, 'B7', `${x.n}×${x.n} 每张 med ${mm} ms > 末档 ${last.medMs} ms（等待确实变长了；倍数不在页面上承诺）`);
+  // 理由句里的比较对象也是实测：末档那两个数一旦被改，抄着旧数的理由句就变成谎话。
+  line(x.reason.includes(`末档 ${last.medRounds} 轮`), 'B7', `${x.n}×${x.n} 的理由要引用末档链长实测 ${last.medRounds} 轮，而不是写死的旧数`);
+  line(x.reason.includes(`${last.medClues}/${last.n * last.n}`), 'B7', `${x.n}×${x.n} 的理由要引用末档线索实测 ${last.medClues}/${last.n * last.n}`);
 }
 
 console.log(`\n合计红线 ${red} 条破口`);

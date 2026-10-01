@@ -169,11 +169,21 @@
       eqd(`${t.label} 三张都挖开了线索（密度 ≤45% · 没被预算掐 · 比满线索薄）`, dug, 3, detail.join(' '));
       ck(`${t.label} 出货盘的节点用量远低于承诺预算`, worstNodes < R.NODE_CAP, `max ${worstNodes}`);
     }
-    // 请出菜单的档位要把理由印在选档页上，不是只写在代码注释里。
+    // 请出菜单的档位要把理由印在选档页上，不是只写在代码注释里；而页面上那串字必须逐字来自
+    // EXCLUDED_TIERS，句里的读数（链长、线索格数、被掐盘数）又必须就是 obs 里那几个。
+    // obs 由 tools/balance.mjs 的 B7 与实测对账，这一段闭的是"文案→obs→实测"这条链的最后一环：
+    // 少了它，页面可以一直抄一个旧数。节点账目不印给玩家（那是成本，不是玩法），只在 B7 里对账。
     const excluded = texts().excluded;
-    ck('选档页印出了 12×12 不在菜单里的理由', /12×12 不在菜单里/.test(excluded), excluded.slice(0, 60));
-    ck('选档页印出了 14×14 不在菜单里的理由', /14×14 不在菜单里/.test(excluded), excluded.slice(0, 60));
-    ck('排除理由带实测读数（不是"暂未开放"这种空话）', /\d+(\.\d+)?(ms|%|盘)/.test(excluded), excluded.slice(0, 90));
+    eq('选档页的排除文案逐字来自 EXCLUDED_TIERS（页面里没有第二份理由）', excluded,
+      K().EXCLUDED_TIERS.map((x) => `${x.n}×${x.n} 不在菜单里：${x.reason}`).join(' '));
+    for (const x of K().EXCLUDED_TIERS) {
+      ck(`${x.n}×${x.n} 的理由印在选档页上（不是一句"暂未开放"）`, excluded.indexOf(`${x.n}×${x.n} 不在菜单里：`) >= 0, excluded.slice(0, 60));
+      const need = [`链长 med ${x.obs.rounds}`, `${x.obs.clues}/${x.obs.cells}`];
+      if (x.obs.cut > 0) need.push(`掐了 ${x.obs.cut}/${x.obs.samples} 盘`);
+      else ck(`${x.n}×${x.n} 的挖预算一次没掐过，理由里就不许说"掐"`, !/掐/.test(x.reason), x.reason.slice(0, 90));
+      eq(`${x.n}×${x.n} 的理由句逐条带上它自己的 obs 读数`, need.filter((s) => x.reason.indexOf(s) < 0).join(' | '), '');
+      ck(`${x.n}×${x.n} 的理由不拿墙钟毫秒当理由（那是这台机器的速度，不是这一档的属性）`, !/\d+(?:\.\d+)?ms/.test(x.reason), x.reason.slice(0, 90));
+    }
     eq('菜单五档在页面上有五个按钮', document.querySelectorAll('#tier-list .tier').length, 5);
     eq('每一档都把自己实测的链长印在按钮上', document.querySelectorAll('#tier-list .tier .tier-meta').length, 5);
     return { scenario: 'gen', perTier };

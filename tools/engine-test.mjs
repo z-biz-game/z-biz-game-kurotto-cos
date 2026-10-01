@@ -196,6 +196,12 @@ for (const t of TIERS) {
 console.log('菜单与预算');
 ok(TIERS.map(t => t.n).join(',') === '6,7,8,9,10', '菜单五档 6/7/8/9/10', TIERS.map(t => t.n).join(','));
 ok(EXCLUDED_TIERS.map(t => t.n).join(',') === '12,14', '12×12 与 14×14 被请出菜单且带理由', EXCLUDED_TIERS.map(t => `${t.n}:${t.reason.length > 20}`).join(' '));
+// obs 的六个读数一个都不能少：balance 的 B7 是逐条对账的，少登记一条就是那一盏常绿的灯。
+ok(EXCLUDED_TIERS.every(t => t.obs && ['samples', 'rounds', 'clues', 'cells', 'cut', 'nodes'].every(k => Number.isInteger(t.obs[k]))),
+  '请出菜单的每一档都登记了完整的 obs 读数', EXCLUDED_TIERS.map(t => `${t.n}:${t.obs ? Object.keys(t.obs).join('+') : 'no obs'}`).join(' '));
+// 页面上的理由句是给玩家看的：墙钟毫秒是这台机器的速度，写进理由就成了没人能复核的承诺。
+ok(EXCLUDED_TIERS.every(t => !/\d+(?:\.\d+)?ms/.test(t.reason)), '排除理由里不拿墙钟毫秒当理由',
+  EXCLUDED_TIERS.map(t => t.n).join(','));
 ok(BUDGET.cap === NODE_CAP && BUDGET.callNodes === 5000 && BUDGET.digNodes === 120000 && BUDGET.order === 'near',
   '出题预算：单次 5000 节点 / 每盘挖 120000 节点 / near 挑格 / 承诺预算 2000000 节点', JSON.stringify(BUDGET));
 ok(BUDGET.timeMs === undefined && BUDGET.digMs === undefined,

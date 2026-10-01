@@ -9,10 +9,9 @@ import { mulberry32, shuffled } from './rng.js';
 
 export const NB = [[-1, 0], [1, 0], [0, -1], [0, 1]];
 
-// 菜单档位。12×12 与 14×14 被请出菜单：挖预算在 8 盘里被掐 7/8 与 8/8，出的是没挖过的满线索盘
-// （圈密度 33% / 37%，高于 10×10 的 27%），而推理深度不随尺寸增长。理由印在选档页上。
-// med 是选档页印出去的"实测链长 / 实测耗时"，由 tools/balance.mjs 的 B5/B5b 逐档核对：
-// 链长写等式（它是盘的属性），耗时只卡方向（它是机器速度）。
+// 菜单五档。12×12 与 14×14 被请出菜单：更大的盘没有买到更长的推理链，只买到成倍的出题成本。
+// med 是选档页印出去的"实测链长 / 实测耗时"，由 tools/balance.mjs 逐档核对：
+// 链长写等式（它是盘与 seed 的属性），耗时只卡方向（它是机器速度，写成等式就会随负载变红）。
 export const TIERS = [
   { n: 6, label: '6×6', name: '初', pBlack: 0.34, med: { rounds: 8, ms: 9 } },
   { n: 7, label: '7×7', name: '中', pBlack: 0.34, med: { rounds: 11, ms: 26 } },
@@ -21,15 +20,28 @@ export const TIERS = [
   { n: 10, label: '10×10', name: '高', pBlack: 0.34, med: { rounds: 18, ms: 636 } },
 ];
 // 请出菜单的档位：理由是量出来的，而且要在选档页上印出来（不是一句"暂未开放"）。
-// 读数出自 node 侧同一份 BUDGET（单次 5000 节点 / 每盘挖 120000 节点），8 张一盘，seed 从 5000 起。
+// obs 里的每一个数都由 tools/balance.mjs 的 B7 当场复跑再逐条对账：seed 流与菜单同一份
+// （seed = 5000 + s*7919 + n，固定 5 张，不吃 SAMPLES），链长 / 线索 / 被掐盘数 / 出题节点数
+// 只由 seed 与节点预算决定，换一台机器是同一个数，所以写等式。
+// 理由句里出现的读数——包括它引用末档的那两个数——同样由 B7 逐个 grep 回实测；
+// 墙钟毫秒不进页面文案：它是这台机器的速度而不是这一档的属性，印出去就成了一句没人能核对的承诺。
 export const EXCLUDED_TIERS = [
-  { n: 12, reason: '每张 p95 4938ms 越过 4000ms 的等待承诺（B1），而链长 med 只从 18 涨到 20 —— 多等的那两秒买不到更长的推理' },
-  { n: 14, reason: '挖线索的节点预算 8 盘里掐了 6 盘，出的是没挖开的厚线索盘（圈密度 30% > 菜单里的 25–27%）；每张 med 9734ms 是承诺的 2.4 倍，链长 med 20 与 12×12 相同' },
+  {
+    n: 12,
+    obs: { samples: 5, rounds: 19, clues: 38, cells: 144, cut: 0, nodes: 36250 },
+    reason: '链长 med 19 轮，只比菜单末档 18 轮多 1 轮；线索还有 38/144 格，密度反而比末档的 25/100 更高——盘大了一圈，买到的不是更长的推理，是一张更厚的题面和更久的等待',
+  },
+  {
+    n: 14,
+    obs: { samples: 5, rounds: 20, clues: 53, cells: 196, cut: 4, nodes: 124727 },
+    reason: '挖线索的每盘节点预算掐了 4/5 盘，出的是没挖开的厚线索盘（线索 53/196 格，比末档的 25/100 还密）；链长 med 20 轮也只比末档 18 轮多 2 轮',
+  },
 ];
 
-// 单次调用只花 5000 个节点是量出来的选择：与 20000 那版逐张对照（_tmp-kurotto-sweep.log），
-// 五档出货 10/10、线索 med 17/20/26 一格没变、链长 med 不变，而 10×10 每张 p95 从 4183ms 落到 2638ms，
-// 挖线索被节点预算掐住的盘反而从 3/10 降到 1/10。承诺线（B1 的 4000ms）一个字没动。
+// 单次计数调用只花得起 callNodes 个节点。这个数字是这么用的：撞了软预算就带着此刻更多的线索
+// 出货（挖线索单调安全，见文件头），所以它买的是"每张多久"，不改"这是哪张盘"。
+// 为什么取 5000 而不是更大：本仓没有它的对照闸，README 的承诺表把这一格标成"无闸"。
+// cap / callNodes / digNodes 三个预算都是纯节点数，墙钟不参与任何判定。
 export const BUDGET = { cap: NODE_CAP, callNodes: 5000, digNodes: 120000, order: 'near' };
 
 // 从一份完整涂法读出每个圈位该有的数字。这是 R4 的第三遍独立写法：
@@ -136,7 +148,7 @@ export function makePuzzle(n, rnd, opts = {}) {
     let depth = 0, steps = 0;
     RULES.forEach((r, k) => { if (paFinal.fired[r] > 0) depth = Math.max(depth, k + 1); steps += paFinal.fired[r]; });
     return {
-      n, B, black: answer, clues, empties, attempts, digTry, digReject, maxNodes, maxCallMs,
+      n, B, black: answer, clues, empties, attempts, digTry, digReject, maxNodes, maxCallMs, nodes: totalNodes,
       depth, steps, rounds: paFinal.rounds, digStopped, digUsed,
       avgNodes: Math.round(totalNodes / Math.max(1, digTry + 1)),
       ms: Date.now() - t0, fired, rejects: Object.fromEntries(rejects),

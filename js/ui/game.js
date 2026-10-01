@@ -146,7 +146,9 @@ export function hint(g) {
     g._trace = byCell;
     g._rounds = s.rounds;
   }
-  const order = [...g._trace.keys()];
+  // trace 里也有圈格（K1 把它们钉成白），但圈格永远涂不上：留在候选里的话，提示按下去只加次数
+  // 不落子——玩家什么也没发生。候选只从"玩家能动的格"里挑。
+  const order = [...g._trace.keys()].filter(i => !isCircle(g.cell[i]));
   const wrong = order.find(i => g.marks[i] !== BLACK && g.marks[i] !== WHITE);
   const pickIdx = order.find(i => g.marks[i] === (g._trace.get(i).val === BLACK ? WHITE : BLACK))
     ?? wrong ?? order[0];
@@ -155,7 +157,7 @@ export function hint(g) {
   const painted = paint(g, pickIdx, h.val);
   g.hints++;
   g.flash = pickIdx;
-  return { g, rule: h.rule, cell: pickIdx, val: h.val, text: h.text, changed: painted.changed, pos: `R${((pickIdx / g.n) | 0) + 1}C${(pickIdx % g.n) + 1}` };
+  return { g, rule: h.rule, cell: pickIdx, val: h.val, text: h.text, changed: painted.changed, from: painted.from, pos: `R${((pickIdx / g.n) | 0) + 1}C${(pickIdx % g.n) + 1}` };
 }
 
 export function serialize(g) {

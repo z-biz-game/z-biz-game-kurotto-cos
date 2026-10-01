@@ -250,5 +250,31 @@ console.log('两条路的独立性');
   ok(!/countSolutions/.test(src), 'pencil.js 里没有引用 countSolutions');
 }
 
+// ---------- 10. 提示：按下去必须真的落一格 ----------
+// 这一组是从浏览器腿的一条红搬下来的：trace 里 K1 也会给圈格钉白，圈格涂不上，
+// 于是提示只加次数不落子。这种错在页面上是"按钮按了没反应"，在引擎层必须当场红。
+console.log('提示逐格');
+{
+  const UI = await import('../js/ui/game.js');
+  const g = UI.newGame(7, 5000);
+  const plain = [...g.cell.keys()].filter(i => !isCircle(g.cell[i]));
+  let landed = 0, onCircle = 0, badRule = 0, moved = 0;
+  for (let k = 0; k < plain.length + 5; k++) {
+    if (UI.isSolved(g)) break;
+    const r = UI.hint(g);
+    moved++;
+    if (r.changed) landed++;
+    if (isCircle(g.cell[r.cell])) onCircle++;
+    if (!RULES.some(x => x.startsWith(r.rule + '_'))) badRule++;
+  }
+  ok(onCircle === 0, '提示从不落在圈格上（圈格涂不上，按了等于没按）', `落在圈格 ${onCircle} 次`);
+  ok(badRule === 0, '提示每次点名的都是六条命名规则之一', `说不清来源 ${badRule} 次`);
+  ok(landed === plain.length && moved === plain.length,
+    '逐格提示：每按一次落一格，落满非圈格刚好停手', `${landed}/${plain.length} 格 · 按了 ${moved} 次`);
+  ok(UI.isSolved(g), '只按提示就能推到判据成立', `未定 ${UI.remaining(g)} 格`);
+  ok(g.hints === plain.length && g.moves === plain.length,
+    '提示次数与步数都等于非圈格数（一次都没有白按）', `提示 ${g.hints} / 步数 ${g.moves} / 非圈格 ${plain.length}`);
+}
+
 console.log(`\n合计 ${pass} 项通过，${fail} 项失败`);
 process.exit(fail ? 1 : 0);

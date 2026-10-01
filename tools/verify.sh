@@ -198,6 +198,8 @@ for base in "${SHAPES[@]}"; do
         # 证人必须在派发导航之前拿到：node 先把 timeOrigin/doc/哨兵读回来。
         W=$(node tools/playtest.cjs witness | tail -1)
         echo "  WITNESS $W"
+        # 证人不在场，续局腿就没有可比的东西：这里必须当场红，不能拖到 resume 里变成"一条断言都没跑"。
+        case "$W" in *'"doc"'*) ;; *) echo "  RED witness 没拿到读数（续局腿没有证人＝没跑）：$W" >&2; FAILED=1 ;; esac
         export WITNESS="$W"
         # 对照腿：片段导航不算重载 —— timeOrigin 与文档身份都不许变。
         run_cmd fragleg nav "${base}#gate-fragment-nav" same
@@ -205,15 +207,14 @@ for base in "${SHAPES[@]}"; do
         run_scenario resume save
         # 坏档：顺序很重要。先真重载拿到一个干净的文档，再把坏 payload 种下去——
         # 反过来做的话，重载那一下的 pagehide 会让这个文档把它自己那局合法存档写回去，
-        # 刚种下的坏档在 scenario 读到它之前就被覆写了。Store.save 一并摘掉（本页只读不写），
-        # 再把 URL 上的 #t=…&s=… 抹掉（replaceState 是同一文档，不触发 unload）：
-        # 留着 hash 的话，下一个文档一开机就按深链自动摆一盘，并且立刻把这份合法存档写回去。
+        # 刚种下的坏档在 scenario 读到它之前就被覆写了。persistOff 一并摘掉写入（本页只读不写，
+        # 开关由页面提供：ESM 的 namespace 属性是只读的，import * 那份 Store.save 写不进去）。
+        # 这仓没有 #hash 深链，所以不需要抹 URL——重载之后 URL 本来就没有片段。
         run_cmd reloadleg reload
-        node tools/playtest.cjs eval "window.__plantedGarbage='3 payloads';
-          history.replaceState(null,'',location.pathname+location.search);
-          window.hebi.engine.Store.save=function(){return this.data;};
-          localStorage.setItem('hebi-cos:v1', JSON.stringify({v:1,settings:{sound:true},best:{},totals:{solved:0,hints:0,ms:0},seedCounter:'nope',resume:{tier:'slant',seed:'20260929',cells:'zzz',R:9,C:9,bl:[]}}));
-          localStorage.setItem('hebi-cos:v1:probe','1');" nonav >/dev/null 2>&1
+        node tools/playtest.cjs eval "window.__plantedGarbage='6 payloads';
+          window.kurotto.pausePersist();
+          localStorage.setItem('kurotto.save', JSON.stringify({v:1,n:'slant',tier:7,seed:'20261001',cell:'zzz',marks:[],__kt_garbage__:1}));
+          localStorage.getItem('kurotto.save')" nonav >/dev/null 2>&1
         run_scenario corrupt save
         leg_stop ;;
       *)

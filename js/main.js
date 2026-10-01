@@ -33,6 +33,9 @@ const rndSeed = mulberry32((Date.now() ^ (Math.random() * 0xffffffff)) >>> 0);
 const DOC = 'doc' + Math.random().toString(36).slice(2, 10);
 let state = null;   // { g, undo: [], view }
 let tick = null;
+// 坏档那条腿要让页面只读不写：ESM 的 namespace 属性写不进去（import * 是只读的），
+// 所以摘掉写入这件事得由页面自己提供一个开关。
+let persistOff = false;
 const keyStats = { seen: 0, handled: 0, repeated: 0, by: {} };   // 键盘腿的读数：事件到底有没有送到这个文档
 
 // seed 不按日期算：换一局必须真的换一张盘，界面显示的 seed 就是这张盘的 seed。
@@ -122,14 +125,20 @@ function startClock() {
 }
 
 function persist() {
-  if (!state || !storageAvailable()) return;
+  if (!state || !storageAvailable() || persistOff) return;
+  // 存档里的计时必须是"到目前为止"的：只在回选档时结算的话，玩到一半被关掉的档存的是 0，
+  // 续局腿要断言的"计时接着走"就永远接着一个假数走。折叠之后把起点挪到此刻，免得重复计费。
+  state.g.elapsed = elapsed();
+  state.startedAt = Date.now();
   saveGame(G.serialize(state.g));
 }
 
 function paintAll() {
   const g = state.g;
   const bad = G.conflicts(g);
-  draw(el.canvas, { n: g.n, cell: g.cell, marks: g.marks, bad, sel: g.sel, flash: g.flash });
+  // 宽度问的是舞台，不是 #board-wrap：那颗布是 inline-block，宽度就是画布自己的宽度，
+  // 让它当尺子画布会越画越大（layout 腿量到过 42px 的格）。
+  draw(el.canvas, { n: g.n, cell: g.cell, marks: g.marks, bad, sel: g.sel, flash: g.flash }, el.wrap.parentElement.clientWidth);
   const totalBlack = G.blackTotal(g);
   el.moves.textContent = String(g.moves);
   el.hints.textContent = String(g.hints);
@@ -178,6 +187,7 @@ function checkWin() {
 }
 
 function doHint() {
+  if (!state) return;
   const r = G.hint(state.g);
   if (r.rule) {
     el.hintRule.textContent = r.rule;
@@ -185,6 +195,8 @@ function doHint() {
   } else {
     el.hintLine.textContent = r.why;
   }
+  // 提示改的格也要能退：doUndo 的文案早就这么承诺了，退不掉的那句就是谎。
+  if (r.changed) state.undo.push({ i: r.cell, from: r.from });
   afterChange();
 }
 
@@ -192,6 +204,10 @@ function doPaint(val) {
   if (!state) return;
   const i = state.g.sel;
   if (i < 0) { el.state.textContent = '先选一格。'; return; }
+  if (RULES_MOD.isCircle(state.g.cell[i])) {
+    el.state.textContent = '圈格里印着题面的线索，它永远不是黑块 —— 这一格不能涂。';
+    return;
+  }
   const before = state.g.marks[i];
   const r = G.paint(state.g, i, val);
   if (r.changed) state.undo.push({ i, from: before });
@@ -201,6 +217,10 @@ function doPaint(val) {
 function doCycle(i) {
   if (!state) return;
   if (i < 0) return;
+  if (RULES_MOD.isCircle(state.g.cell[i])) {
+    el.state.textContent = '圈格里印着题面的线索，它永远不是黑块 —— 这一格不能涂。';
+    return;
+  }
   const before = state.g.marks[i];
   const r = G.cycle(state.g, i);
   if (r.changed) state.undo.push({ i, from: before });
@@ -232,6 +252,20 @@ el.canvas.addEventListener('pointerdown', ev => {
   doCycle(cellAt(el.canvas, state.g.n, ev.clientX, ev.clientY));
 });
 el.canvas.addEventListener('contextmenu', ev => ev.preventDefault());
+// 屏宽一变画布就得重排：尺寸的尺子（舞台宽度、devicePixelRatio）都只在 paintAll 里读一次，
+// 没有这个监听的话，转屏/缩窗之后棋盘还是上一次的大小，玩家点到的格与画出来的格错位。
+// 触屏腿量的就是这个：覆写视口之后、第一次点击之前，画布的后备缓冲必须已经跟上新 dpr。
+window.addEventListener('resize', () => { if (state) paintAll(); });
+// 像素比变了不一定会补一次 resize（CDP 覆视口就是先改宽度、后改 dpr，两次重排之间画布按旧 dpr
+// 排好了；用户把窗口拖到另一块屏上也是同一件事）。画布的后备缓冲停在旧 dpr 上就是糊的一张图，
+// 而闸在像素上对颜色——所以 dpr 一变就重排。
+function watchPixelRatio() {
+  const mq = matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
+  const onChange = () => { if (state) paintAll(); watchPixelRatio(); };
+  if (mq.addEventListener) mq.addEventListener('change', onChange, { once: true });
+  else mq.addListener(onChange);
+}
+watchPixelRatio();
 
 function handleKey(ev) {
   const k = ev.key;
@@ -269,7 +303,13 @@ $('#btn-menu').addEventListener('click', backToMenu);
 $('#btn-menu-2').addEventListener('click', backToMenu);
 $('#btn-again').addEventListener('click', () => startGame(state.g.n, nextSeed()));
 $('#btn-reset').addEventListener('click', () => { wipeAll(); renderMenu(); el.state.textContent = '存档已清空。'; });
-el.btnTheme.addEventListener('click', () => { const t = Theme.toggle(); savePrefs({ theme: t }); });
+el.btnTheme.addEventListener('click', () => {
+  const t = Theme.toggle();
+  savePrefs({ theme: t });
+  // 棋盘的颜色是从 CSS 变量现读的，变量换了但画布上还留着上一次的颜色——不重绘就是"换了主题，
+  // 棋盘没换"。layout 腿在两种主题下各采一次像素，这里不重绘会当场红。
+  if (state) paintAll();
+});
 $('#btn-resume').addEventListener('click', () => { const s = loadSave(); if (s) resumeGame(s); else renderMenu(); });
 
 function backToMenu() {
@@ -298,13 +338,14 @@ window.kurotto = {
   undo: () => doUndo(),
   menu: backToMenu,
   save: KEYS,
+  pausePersist: () => { persistOff = true; },
   storageAvailable,
   texts: () => ({
-    moves: el.moves.textContent, hints: el.hints.textContent, black: el.black.textContent,
-    remaining: el.remaining.textContent, conflicts: el.conflicts.textContent,
+    name: el.name.textContent, moves: el.moves.textContent, hints: el.hints.textContent,
+    black: el.black.textContent, remaining: el.remaining.textContent, conflicts: el.conflicts.textContent,
     score: el.score.textContent, genms: el.genms.textContent, time: el.time.textContent,
     seed: el.seed.textContent, tier: el.tier.textContent, state: el.state.textContent,
-    hintRule: el.hintRule.textContent, excluded: el.excluded.textContent,
+    hintRule: el.hintRule.textContent, hintLine: el.hintLine.textContent, excluded: el.excluded.textContent,
   }),
 };
 

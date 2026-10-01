@@ -10,11 +10,13 @@ function css(name, fallback) {
   return v || fallback;
 }
 
-export function layout(canvas, n) {
+// 可用宽度由装配层给：#board-wrap 是 inline-block，它的宽度就是画布自己的宽度，拿父元素当尺子
+// 等于让画布量自己——第一次画读到的是空宽度，之后每重绘一次涨一点，同一档会"越画越大"。
+const WRAP_CHROME = 14; // #board-wrap 的 padding(6×2) + border(1×2)：画布装得下才是这一屏的宽度
+
+export function layout(canvas, n, availPx) {
   const dpr = Math.max(1, window.devicePixelRatio || 1);
-  const avail = Math.min(
-    (canvas.parentElement.clientWidth || 640) - 4,
-    CELL_TARGET * n + 2);
+  const avail = Math.min((availPx || 640) - WRAP_CHROME, CELL_TARGET * n + 2);
   const cssSize = Math.max(CELL_TARGET * 3, Math.floor(avail / n) * n);
   const cell = cssSize / n;
   canvas.style.width = cssSize + 'px';
@@ -45,9 +47,9 @@ export function cellCenter(canvas, n, i) {
 }
 
 // game: { n, cell:Int16Array, marks:Uint8Array, bad:Set<number>, sel:number, flash:number }
-export function draw(canvas, game) {
+export function draw(canvas, game, availPx) {
   const { n } = game;
-  const { ctx, cssSize, cell } = layout(canvas, n);
+  const { ctx, cssSize, cell } = layout(canvas, n, availPx);
   const ink = css('--ink', '#EDEFF3');
   const bg = css('--board-bg', '#212B3A');
   const line = css('--grid-line', '#3A4454');

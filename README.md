@@ -175,7 +175,7 @@ CI 里没有任何 `npm install`：这仓零运行时依赖，拉一个打包器
 | 刀 | 打在哪 | 文件 | 针（原文） | 改成 | 期望点名 | 命令 | 实测 rc |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | K1 | 判据 1 的账改成"数邻格有几个黑格"（R4 退回 R1） | `js/engine/rules.js` | `seen.add(comp[j]); got += sizes[comp[j]];` | `seen.add(comp[j]); got += 1;` | `官方解答在 R4 下合法` | `node tools/engine-test.mjs` | ? |
-| K2 | 铅笔 K4 放宽成"有门口就涂黑"（开始猜） | `js/engine/pencil.js` | `if (a.counted < v && a.gates.size === 1) { put([...a.gates][0], BLACK, RULES[3]); step(); }` | `if (a.counted < v && a.gates.size >= 1) { put([...a.gates][0], BLACK, RULES[3]); step(); }` | `铅笔推满 == 计数器唯一解` | `node tools/engine-test.mjs` | ? |
+| K2 | 铅笔 K4 放宽成"有门口就涂黑"（开始猜） | `js/engine/pencil.js` | `if (a.counted < v && a.gates.size === 1) { put([...a.gates][0], BLACK, RULES[3]); step(); }` | `if (a.counted < v && a.gates.size >= 1) { put([...a.gates][0], BLACK, RULES[3]); step(); }` | `官方例题铅笔 0 猜推满` | `node tools/engine-test.mjs` | ? |
 | K3 | 把墙钟混进 seed（"同一档同一 seed 同一张盘"就此作废） | `js/engine/rng.js` | `let a = seed >>> 0;` | `let a = (seed ^ Date.now()) >>> 0;` | `同 seed 两次生成逐格相同` | `node tools/engine-test.mjs` | ? |
 | K4 | 选档页的链长抄错一格 | `js/engine/generate.js` | `med: { rounds: 18, ms: 636 }` | `med: { rounds: 17, ms: 636 }` | `B5` | `node tools/balance.mjs` | ? |
 | K5 | 排除理由抄回废弃的墙钟读数 | `js/engine/generate.js` | `链长 med 19 轮，只比菜单末档 18 轮多 1 轮` | `每张 p95 4938ms 越过 4000ms 的等待承诺` | `B7` | `node tools/balance.mjs` | ? |

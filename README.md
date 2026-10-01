@@ -124,7 +124,7 @@ engine 21 / gen 38 / play 30 / hint 16 / win 20 / layout 26 / mouseleg 41 / touc
 | 换一局 p95 等待 ≤ 4000 ms | `B1` | 那一档请出菜单，线不挪；线有没有被挪由 `D5d` 拿文档那句与 `COST_MS` 对账 |
 | 菜单四档的链长阶梯是真的 | `B3` · `B3b` · `B5` | 实测与页印分家、或阶梯被压平即红 |
 | 选档页那句排除理由今天还成立 | `B7` | obs 与实测分家、理由句抄了别的批次的末档数、或句里没有分母即红 |
-| 选档页的按钮不印墙钟 | `verify.sh:gen` · `engine-test` | 按钮文案与 TIERS 的链长/线索分家、或理由句里冒出毫秒与"几秒"即红 |
+| 选档页的按钮不印墙钟 | `verify.sh:gen` · `engine-test` · `D1` | 按钮文案与 TIERS 的链长/线索分家、或理由句里冒出毫秒与"几秒"即红；源码那一头的 D1f 还配了 D1f0/D1f1 两条反空转（台账的 K12 打毫秒回归、K13 打"解析不到按钮文案"） |
 | 六条规则都不是装饰 | `B6` · `B6-guard` | 某档整档不开火即红 |
 | 页面上的数字与存档/seed 不说谎 | `verify.sh:play` · `verify.sh:save` · `verify.sh:resume` | DOM 文本与状态机分家即红 |
 | 存档恢复不自动开局、坏档不崩 | `verify.sh:corrupt` · `verify.sh:reloadleg` | 六种坏 payload 任一让页面报错即红 |
@@ -180,9 +180,9 @@ CI 里没有任何 `npm install`：这仓零运行时依赖，拉一个打包器
 
 | 刀 | 打在哪 | 文件 | 针（原文） | 改成 | 期望点名 | 命令 | 实测 rc |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| K1 | 判据 1 的账改成"数邻格有几个黑格"（R4 退回 R1） | `js/engine/rules.js` | `seen.add(comp[j]); got += sizes[comp[j]];` | `seen.add(comp[j]); got += 1;` | `官方解答在 R4 下合法` | `node tools/engine-test.mjs` | 1 |
-| K2 | 铅笔 K4 放宽成"有门口就涂黑"（开始猜） | `js/engine/pencil.js` | `if (a.counted < v && a.gates.size === 1) { put([...a.gates][0], BLACK, RULES[3]); step(); }` | `if (a.counted < v && a.gates.size >= 1) { put([...a.gates][0], BLACK, RULES[3]); step(); }` | `官方例题铅笔 0 猜推满` | `node tools/engine-test.mjs` | 1 |
-| K3 | 把墙钟混进 seed（"同一档同一 seed 同一张盘"就此作废） | `js/engine/rng.js` | `let a = seed >>> 0;` | `let a = (seed ^ Date.now()) >>> 0;` | `同 seed 两次生成逐格相同` | `node tools/engine-test.mjs` | 1 |
+| K1 | 判据 1 的账改成"数邻格有几个黑格"（R4 退回 R1） | `js/engine/rules.js` | `seen.add(comp[j]); got += sizes[comp[j]];` | `seen.add(comp[j]); got += 1;` | `官方解答在 R4 下合法` | `node tools/engine-test.mjs` | ? |
+| K2 | 铅笔 K4 放宽成"有门口就涂黑"（开始猜） | `js/engine/pencil.js` | `if (a.counted < v && a.gates.size === 1) { put([...a.gates][0], BLACK, RULES[3]); step(); }` | `if (a.counted < v && a.gates.size >= 1) { put([...a.gates][0], BLACK, RULES[3]); step(); }` | `官方例题铅笔 0 猜推满` | `node tools/engine-test.mjs` | ? |
+| K3 | 把墙钟混进 seed（"同一档同一 seed 同一张盘"就此作废） | `js/engine/rng.js` | `let a = seed >>> 0;` | `let a = (seed ^ Date.now()) >>> 0;` | `同 seed 两次生成逐格相同` | `node tools/engine-test.mjs` | ? |
 | K4 | 选档页的链长抄错一格 | `js/engine/generate.js` | `med: { rounds: 14, clues: 20, ms: 215 }` | `med: { rounds: 13, clues: 20, ms: 215 }` | `B5` | `node tools/balance.mjs` | ? |
 | K5 | 排除理由抄回废弃的墙钟读数 | `js/engine/generate.js` | `链长 med 19 轮只比末档多 1 轮` | `每张 p95 4938ms 越过 4000ms 的等待承诺` | `B7` | `node tools/balance.mjs` | ? |
 | K6 | 把请出菜单的 12×12 塞回菜单，抄着它那一批 5 张的读数 | `js/engine/generate.js` | `{ n: 9, label: '9×9', name: '高', pBlack: 0.34, med: { rounds: 14, clues: 20, ms: 215 } },` | `{ n: 9, label: '9×9', name: '高', pBlack: 0.34, med: { rounds: 14, clues: 20, ms: 215 } },\n  { n: 12, label: '12×12', name: '高', pBlack: 0.34, med: { rounds: 19, clues: 38, ms: 1932 } },` | `B5` | `node tools/balance.mjs` | ? |
@@ -192,10 +192,15 @@ CI 里没有任何 `npm install`：这仓零运行时依赖，拉一个打包器
 | K10 | 种下的红不再种（阴性自证变装饰） | `tools/scenarios.js` | `if (w.__selftest) rows.push({ test: 'GATE_SELFTEST 种下的错期望（1 应当等于 2）', pass: 1 === 2, detail: 'planted red' });` | `if (false) rows.push({ test: 'GATE_SELFTEST 种下的错期望（1 应当等于 2）', pass: 1 === 2, detail: 'planted red' });` | `没有种下的错期望` | `GATE_SELFTEST=1 LEGS=play bash tools/verify.sh` | ? |
 | K11 | 文档抄的逐报告条数与对数表分家 | `README.md` | `engine 21 / gen 38` | `engine 20 / gen 38` | `D8` | `node tools/doctest.mjs` | ? |
 | K12 | 把耗时印回选档页的按钮上（页面那一头的墙钟回归） | `js/main.js` | `<span class="tier-meta">${t.name} · 实测链长 med ${t.med.rounds} 轮 · 线索 med ${t.med.clues}/${t.n * t.n} 格</span>` | `<span class="tier-meta">${t.name} · 实测链长 med ${t.med.rounds} 轮 · 线索 med ${t.med.clues}/${t.n * t.n} 格 · ${t.med.ms} ms</span>` | `D1f` | `node tools/doctest.mjs` | ? |
+| K13 | 把按钮文案的锚点改名，让 D1f 无话可说 | `js/main.js` | `class="tier-meta"` | `class="tier-copy"` | `D1f0` | `node tools/doctest.mjs` | ? |
 
 这里没有一把刀去拆出货前的两道复核（`挖完反而不唯一` / `出货盘铅笔推不满`）：出题器的每道守卫背后还压着下一道，
 拆掉上面那道只会让下一道把盘拦下来，坏盘根本到不了闸面前——这类"拆了照样绿"的刀不是台账的功，它证明的是纵深。
 要证明判据 1 的账真的会红，用的是 K1：把 R4 退回 R1，出货盘立刻就不是那批盘。
+
+K12 与 K13 是成对的两把，打在**同一句承诺**的两头：K12 证明"按钮上出现毫秒"会红，K13 把按钮文案的锚点
+改名，证明 D1f 在解析不到那一截时不会把空转念成通过（改名那一刀下 D1f 自己仍是绿的——红的是它旁边
+那两条反空转）。一条只有"没有 X 即通过"的断言必须配一把"让 X 变得无法检测"的刀，否则它就是一句装饰。
 
 一把只让文件语法坏掉的刀不算红：针打不中、或者刀落下去 rc 还是 0，台账都会点名报错。
 闸"能红"的证据是**这一节的表格里每一行都带着一个 1**。

@@ -67,9 +67,19 @@ const sizeList = (README.match(/选一档\*\*：([\d×/ ]+)。/) || [])[1];
 ok(!!sizeList && sizeList.trim().split(/\s*\/\s*/).join(' ') === TIERS.map(t => `${t.n}×${t.n}`).join(' '),
   'D1e 玩法那一行的尺寸清单逐档等于 TIERS（正文散文里的尺寸也是现值）',
   sizeList ? `文档 ${sizeList.trim()} vs 代码 ${TIERS.map(t => `${t.n}×${t.n}`).join(' / ')}` : '解析不到尺寸清单');
-const msOnButtons = [read('js/main.js'), read('index.html')].filter(src => /class="tier-meta"/.test(src) && /ms/.test(src.match(/class="tier-meta"[^`]*/)?.[0] || ''));
+// D1f 是「页面上不印墙钟」这条承诺唯一的闸，所以它自己得先证明抓到了按钮文案那一截：
+// 把 class 改名、把整行删掉，都会让"没找到 ms"变成一句空话。台账里的 K13 就是打在这一点上的刀。
+const spanIn = f => (read(f).match(/class="tier-meta"[\s\S]*?<\/span>/) || [])[0];
+const buttonSpan = [['js/main.js', spanIn('js/main.js')], ['index.html', spanIn('index.html')]].filter(x => x[1]);
+ok(buttonSpan.length === 1 && buttonSpan[0][0] === 'js/main.js',
+  'D1f0 按钮文案那一截解析到了（只有 js/main.js 有它；解析不到时 D1f 是在空转）',
+  `解析到 ${buttonSpan.length} 处：${buttonSpan.map(x => x[0]).join(' ') || '没有'}`);
+ok(buttonSpan.length === 1 && /链长 med/.test(buttonSpan[0][1]),
+  'D1f1 抓到的那一截确实写着链长（同名 class 挪到别处时不拿它当按钮文案）',
+  buttonSpan.length ? buttonSpan[0][1].slice(0, 56) : '没有可检查的那一截');
+const msOnButtons = buttonSpan.filter(x => /\bms\b/.test(x[1]));
 ok(msOnButtons.length === 0, `D1f 选档页按钮那一行里没有毫秒（页面上印的必须是盘与 seed 的属性）`,
-  msOnButtons.length ? `${msOnButtons.length} 个源文件把 ms 写进了 .tier-meta` : 'js/main.js 的按钮文案只有链长与线索');
+  msOnButtons.length ? `${msOnButtons.map(x => x[0]).join(' ')} 把 ms 写进了 .tier-meta` : buttonSpan.length ? '按钮文案只有链长与线索' : '解析不到按钮文案');
 const tierCountClaims = [...DOCS.matchAll(/(?<![上这那每同换末首])([一二三四五六七八九十])档(?:（|菜单| ×|的|，|、|。)/g)].map(m => m[1]);
 ok(tierCountClaims.length >= 3 && tierCountClaims.every(w => CN[w] === TIERS.length),
   `D1g 文档里所有「N 档」都是 ${TIERS.length} 档（中文数词也要对上）`,

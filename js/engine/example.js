@@ -1,6 +1,8 @@
-// 官方例题（Nikoli kurotto01/02.gif）：逐格读数由 _tmp-kurotto-ascii.mjs 从 PNG 量出后抄在这里。
+// 官方例题（Nikoli kurotto01/02.gif）：逐格读数是从官方 PNG 量出来的，量它的那个脚本是一次性台架、
+// 不随仓发布——所以这份数据本身就是证据的落脚点，树里凡要用例题的都从这里读，不再各抄一遍。
 // 这份数据是「圈里的数字数什么」那条裁断的证物：node 侧 tools/engine-test.mjs 与浏览器侧
-// tools/scenarios.js 都读这同一个模块。两边各抄一遍的话，抄错的那一份会替另一份说话。
+// tools/scenarios.js 都读这同一个模块，DESIGN.md §1 那张表由 D12 拿它重算一遍。
+// 两边各抄一遍的话，抄错的那一份会替另一份说话。
 import { EMPTY } from './rules.js';
 
 export const EX_N = 4;

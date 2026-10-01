@@ -80,7 +80,7 @@ export function solve(B, opts = {}) {
   };
 
   let conflict = null;
-  let rounds = 0; // 推满用了多少轮：链长是本仓唯一有内容的难度读数（步数恒等于 n²，见 DESIGN.md §4）
+  let rounds = 0; // 推满用了多少轮：链长是本仓唯一有内容的难度读数（要钉的格数由题面固定，见 DESIGN.md §4）
   function put(i, val, rule) {
     if (asg[i] === val) return false;
     if (asg[i] !== UNK) { conflict = `${rule} 要求 ${pos(i)}=${val === BLACK ? '黑' : '白'}，可它已经是${asg[i] === BLACK ? '黑' : '白'}`; return true; }

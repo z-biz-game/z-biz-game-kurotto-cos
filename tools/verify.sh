@@ -75,6 +75,12 @@ trap cleanup EXIT
 FAILED=0
 REPORTS="$TMPD/reports.txt"; : >"$REPORTS"; export REPORTS
 LEGS=${LEGS:-core play win mouse touch keys save}
+# 每份报告的断言条数。README「闸的形状」那一节抄的就是这张表，tools/doctest.mjs 的 D8 逐条对账。
+# 为什么在闸里数：条数是跑出来的读数，只写在文档上就会随代码漂——加了断言、删了断言，文档还在报
+# 上一个世界的数，而"文档自己加起来等于自己"那道恒等式照样绿。这里数一次，文档那侧才有分母。
+# GATE_SELFTEST 那一种多一条种下的红，所以下面按 +1 比。
+EXPECTS='engine=21 gen=41 play=30 hint=16 win=20 layout=26 mouseleg=41 touchleg=44 keysleg=26 save=22 fragleg=4 resume=15 reloadleg=4 corrupt=16'
+export EXPECTS
 
 leg_start() {   # $1 = leg name, $2 = base url
   UDD=$(mktemp -d "$TMPD/udd-$1.XXXXXX")
@@ -127,6 +133,14 @@ if selfmode:
     open(os.environ['REPORTS'], 'a').write('%s %d\n' % (leg, planted))
     if planted == 0:
         print('  RED %s：这一份报告里没有种下的错期望（这条腿证明不了自己能红）' % leg); sys.exit(1)
+# 条数对账：这份报告跑的断言数必须等于对数表里那格（自测模式多一条种下的红）。
+name = leg.split('/')[-1]
+table = dict(kv.split('=') for kv in os.environ['EXPECTS'].split())
+if name not in table:
+    print('  RED %s：对数表里没有「%s」这一份（新增或改名的报告必须登记条数，不能让文档抄一个猜的数）' % (leg, name)); sys.exit(1)
+want = int(table[name]) + (1 if selfmode else 0)
+if len(d['rows']) != want:
+    print('  RED %s：断言 %d 条，对数表写 %d 条——文档「闸的形状」抄的就是这张表，漂了要当场说' % (leg, len(d['rows']), want)); sys.exit(1)
 extra = {k: v for k, v in d.items() if k not in ('rows', 'fail')}
 print('  %d checks, %d failed  %s' % (len(d['rows']), d['fail'], extra if extra else ''))
 sys.exit(1 if d['fail'] else 0)

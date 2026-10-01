@@ -3,6 +3,7 @@
 import { makeBoard, countSolutions, countSolutionsDumb, violations, isCircle, isNum, nbrs, FREE, EMPTY, NODE_CAP } from '../js/engine/rules.js';
 import { solve, RULES } from '../js/engine/pencil.js';
 import { makePuzzle, numberAt, TIERS, BUDGET, EXCLUDED_TIERS } from '../js/engine/generate.js';
+import { READINGS } from '../js/engine/readings.js';
 import { mulberry32 } from '../js/engine/rng.js';
 import { EX_N, EX_CLUES, EX_BLACK } from '../js/engine/example.js';
 
@@ -27,34 +28,8 @@ const exBlack = new Uint8Array(EX_N * EX_N);
 for (const [r, c] of EX_BLACK) exBlack[r * EX_N + c] = 1;
 
 // ---------- 1. 四条候选读法打在官方例题上：只有 R4 全中 ----------
+// 读法本身在 js/engine/readings.js（doctest 的 D12 拿同一份去核对 DESIGN §1 那张表）。
 console.log('判据读法四条');
-function readR1(B, black, i) { // 正交邻格里黑格的个数
-  let k = 0;
-  for (const j of nbrs(B, (i / B.n) | 0, i % B.n)) if (black[j] && !isCircle(B.cell[j])) k++;
-  return k;
-}
-function readR2(B, black, i) { // 四向射线：每个方向上连续黑格长度之和（S1a 英文字面）
-  let k = 0;
-  for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
-    let r = ((i / B.n) | 0) + dr, c = (i % B.n) + dc;
-    while (r >= 0 && r < B.n && c >= 0 && c < B.n && black[r * B.n + c] && !isCircle(B.cell[r * B.n + c])) { k++; r += dr; c += dc; }
-  }
-  return k;
-}
-function readR3(B, black, i) { // 相邻黑格之间成对的数量
-  const nb = nbrs(B, (i / B.n) | 0, i % B.n).filter(j => black[j] && !isCircle(B.cell[j]));
-  let k = 0;
-  for (let a = 0; a < nb.length; a++) for (let b = a + 1; b < nb.length; b++) {
-    const d = Math.abs(((nb[a] / B.n) | 0) - ((nb[b] / B.n) | 0)) + Math.abs((nb[a] % B.n) - (nb[b] % B.n));
-    if (d === 1) k++;
-  }
-  return k;
-}
-const READINGS = [['R1_邻格黑格数', readR1], ['R2_四向射线长', readR2], ['R3_相邻黑格对数', readR3], ['R4_相邻黑块格数和', (B, black, i) => {
-  const v = violations(B, black);
-  const bad = v.find(x => x.r === ((i / B.n) | 0) && x.c === i % B.n);
-  return bad ? bad.got : B.cell[i];
-}]];
 const hitBy = {};
 for (const [name, fn] of READINGS) {
   let hits = 0, total = 0;
@@ -281,6 +256,12 @@ console.log('提示逐格');
   ok(g.hints === plain.length && g.moves === plain.length,
     '提示次数与步数都等于非圈格数（一次都没有白按）', `提示 ${g.hints} / 步数 ${g.moves} / 非圈格 ${plain.length}`);
 }
+
+// 自数：README 的「测试过程与结果」印的就是这个条数，而条数会随断言增删悄悄漂——
+// 文档里那句"引擎闸 N 项"一旦是上一个世界的数，它就不再是证据而是装饰。
+// 钉成常数之后，加/删断言的人必须同时改这里和 README；doctest 的 D11 把三方对上。
+const EXPECT_TOTAL = 347;
+ok(pass + 1 === EXPECT_TOTAL, `断言条数等于登记的 ${EXPECT_TOTAL} 条（这一条自己也算在内）`, `实测 ${pass + 1} 条`);
 
 console.log(`\n合计 ${pass} 项通过，${fail} 项失败`);
 process.exit(fail ? 1 : 0);

@@ -174,17 +174,17 @@ CI 里没有任何 `npm install`：这仓零运行时依赖，拉一个打包器
 
 | 刀 | 打在哪 | 文件 | 针（原文） | 改成 | 期望点名 | 命令 | 实测 rc |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| K1 | 判据 1 的账改成"数邻格有几个黑格"（R4 退回 R1） | `js/engine/rules.js` | `seen.add(comp[j]); got += sizes[comp[j]];` | `seen.add(comp[j]); got += 1;` | `官方解答在 R4 下合法` | `node tools/engine-test.mjs` | ? |
-| K2 | 铅笔 K4 放宽成"有门口就涂黑"（开始猜） | `js/engine/pencil.js` | `if (a.counted < v && a.gates.size === 1) { put([...a.gates][0], BLACK, RULES[3]); step(); }` | `if (a.counted < v && a.gates.size >= 1) { put([...a.gates][0], BLACK, RULES[3]); step(); }` | `官方例题铅笔 0 猜推满` | `node tools/engine-test.mjs` | ? |
-| K3 | 把墙钟混进 seed（"同一档同一 seed 同一张盘"就此作废） | `js/engine/rng.js` | `let a = seed >>> 0;` | `let a = (seed ^ Date.now()) >>> 0;` | `同 seed 两次生成逐格相同` | `node tools/engine-test.mjs` | ? |
-| K4 | 选档页的链长抄错一格 | `js/engine/generate.js` | `med: { rounds: 18, ms: 636 }` | `med: { rounds: 17, ms: 636 }` | `B5` | `node tools/balance.mjs` | ? |
-| K5 | 排除理由抄回废弃的墙钟读数 | `js/engine/generate.js` | `链长 med 19 轮，只比菜单末档 18 轮多 1 轮` | `每张 p95 4938ms 越过 4000ms 的等待承诺` | `B7` | `node tools/balance.mjs` | ? |
-| K6 | 把请出菜单的 12×12 塞回菜单 | `js/engine/generate.js` | `{ n: 10, label: '10×10', name: '高', pBlack: 0.34, med: { rounds: 18, ms: 636 } },` | `{ n: 10, label: '10×10', name: '高', pBlack: 0.34, med: { rounds: 18, ms: 636 } },\n  { n: 12, label: '12×12', name: '高', pBlack: 0.34, med: { rounds: 19, ms: 1932 } },` | `B1` | `node tools/balance.mjs` | ? |
-| K7 | 续局卡把"格已钉"改文案（界面与状态机分家） | `js/main.js` | `格已钉 · seed` | `格钉住 · seed` | `续局卡点名了已钉格数、seed 与提示次数` | `LEGS=save bash tools/verify.sh` | ? |
-| K8 | 画布重新拿自己当尺子（越画越大那个缺陷） | `js/render/board.js` | `const avail = Math.min((availPx \|\| 640) - WRAP_CHROME, CELL_TARGET * n + 2);` | `const avail = Math.min((canvas.parentElement.clientWidth \|\| 640) - WRAP_CHROME, CELL_TARGET * n + 2);` | `尺子不是画布自己` | `LEGS=win bash tools/verify.sh` | ? |
-| K9 | 对数表自己漂一格 | `tools/verify.sh` | `engine=21 gen=41` | `engine=20 gen=41` | `对数表写` | `LEGS=core bash tools/verify.sh` | ? |
-| K10 | 种下的红不再种（阴性自证变装饰） | `tools/scenarios.js` | `if (w.__selftest) rows.push({ test: 'GATE_SELFTEST 种下的错期望（1 应当等于 2）', pass: 1 === 2, detail: 'planted red' });` | `if (false) rows.push({ test: 'GATE_SELFTEST 种下的错期望（1 应当等于 2）', pass: 1 === 2, detail: 'planted red' });` | `没有种下的错期望` | `GATE_SELFTEST=1 LEGS=play bash tools/verify.sh` | ? |
-| K11 | 文档抄的逐报告条数与对数表分家 | `README.md` | `engine 21 / gen 41` | `engine 20 / gen 41` | `D8` | `node tools/doctest.mjs` | ? |
+| K1 | 判据 1 的账改成"数邻格有几个黑格"（R4 退回 R1） | `js/engine/rules.js` | `seen.add(comp[j]); got += sizes[comp[j]];` | `seen.add(comp[j]); got += 1;` | `官方解答在 R4 下合法` | `node tools/engine-test.mjs` | 1 |
+| K2 | 铅笔 K4 放宽成"有门口就涂黑"（开始猜） | `js/engine/pencil.js` | `if (a.counted < v && a.gates.size === 1) { put([...a.gates][0], BLACK, RULES[3]); step(); }` | `if (a.counted < v && a.gates.size >= 1) { put([...a.gates][0], BLACK, RULES[3]); step(); }` | `官方例题铅笔 0 猜推满` | `node tools/engine-test.mjs` | 1 |
+| K3 | 把墙钟混进 seed（"同一档同一 seed 同一张盘"就此作废） | `js/engine/rng.js` | `let a = seed >>> 0;` | `let a = (seed ^ Date.now()) >>> 0;` | `同 seed 两次生成逐格相同` | `node tools/engine-test.mjs` | 1 |
+| K4 | 选档页的链长抄错一格 | `js/engine/generate.js` | `med: { rounds: 18, ms: 636 }` | `med: { rounds: 17, ms: 636 }` | `B5` | `node tools/balance.mjs` | 1 |
+| K5 | 排除理由抄回废弃的墙钟读数 | `js/engine/generate.js` | `链长 med 19 轮，只比菜单末档 18 轮多 1 轮` | `每张 p95 4938ms 越过 4000ms 的等待承诺` | `B7` | `node tools/balance.mjs` | 1 |
+| K6 | 把请出菜单的 12×12 塞回菜单 | `js/engine/generate.js` | `{ n: 10, label: '10×10', name: '高', pBlack: 0.34, med: { rounds: 18, ms: 636 } },` | `{ n: 10, label: '10×10', name: '高', pBlack: 0.34, med: { rounds: 18, ms: 636 } },\n  { n: 12, label: '12×12', name: '高', pBlack: 0.34, med: { rounds: 19, ms: 1932 } },` | `B1` | `node tools/balance.mjs` | 1 |
+| K7 | 续局卡把"格已钉"改文案（界面与状态机分家） | `js/main.js` | `格已钉 · seed` | `格钉住 · seed` | `续局卡点名了已钉格数、seed 与提示次数` | `LEGS=save bash tools/verify.sh` | 1 |
+| K8 | 画布重新拿自己当尺子（越画越大那个缺陷） | `js/render/board.js` | `const avail = Math.min((availPx \|\| 640) - WRAP_CHROME, CELL_TARGET * n + 2);` | `const avail = Math.min((canvas.parentElement.clientWidth \|\| 640) - WRAP_CHROME, CELL_TARGET * n + 2);` | `尺子不是画布自己` | `LEGS=win bash tools/verify.sh` | 1 |
+| K9 | 对数表自己漂一格 | `tools/verify.sh` | `engine=21 gen=41` | `engine=20 gen=41` | `对数表写` | `LEGS=core bash tools/verify.sh` | 1 |
+| K10 | 种下的红不再种（阴性自证变装饰） | `tools/scenarios.js` | `if (w.__selftest) rows.push({ test: 'GATE_SELFTEST 种下的错期望（1 应当等于 2）', pass: 1 === 2, detail: 'planted red' });` | `if (false) rows.push({ test: 'GATE_SELFTEST 种下的错期望（1 应当等于 2）', pass: 1 === 2, detail: 'planted red' });` | `没有种下的错期望` | `GATE_SELFTEST=1 LEGS=play bash tools/verify.sh` | 1 |
+| K11 | 文档抄的逐报告条数与对数表分家 | `README.md` | `engine 21 / gen 41` | `engine 20 / gen 41` | `D8` | `node tools/doctest.mjs` | 1 |
 
 这里没有一把刀去拆出货前的两道复核（`挖完反而不唯一` / `出货盘铅笔推不满`）：出题器的每道守卫背后还压着下一道，
 拆掉上面那道只会让下一道把盘拦下来，坏盘根本到不了闸面前——这类"拆了照样绿"的刀不是台账的功，它证明的是纵深。

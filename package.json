@@ -1,0 +1,27 @@
+{
+  "name": "kurotto",
+  "version": "1.0.0",
+  "description": "クロット Kurotto — 零猜测黑块推理. 圈里的数字数的是紧贴它的相邻黑区一共有几格；出题时两条独立路径同时验收：逐格穷举计数器在 2000000 节点预算内数到唯一解，命名规则铅笔从空格推满整盘。难度链长是量出来的。",
+  "type": "module",
+  "scripts": {
+    "start": "node server.cjs",
+    "dev": "node server.cjs 5282",
+    "test": "node tools/engine-test.mjs",
+    "balance": "node tools/balance.mjs",
+    "check": "for f in $(find js tools -type f \\( -name \"*.js\" -o -name \"*.mjs\" -o -name \"*.cjs\" \\) | sort); do node --check \"$f\" || exit 1; done && echo OK",
+    "doctest": "node tools/doctest.mjs"
+  },
+  "keywords": [
+    "game",
+    "puzzle",
+    "kurotto",
+    "nikoli",
+    "logic",
+    "deduction",
+    "no-guess",
+    "procedural",
+    "web"
+  ],
+  "author": "z-biz-game",
+  "license": "MIT"
+}

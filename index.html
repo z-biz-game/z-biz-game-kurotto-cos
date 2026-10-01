@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0A0D14" />
+<title>クロット · Kurotto 黑块数</title>
+<meta name="description" content="Kurotto クロット：圈里的数字写的是「与这个圈相邻的黑块一共有几格」。每一局唯一解、每一局都能用命名规则 K1–K6 推到底，提示只说推得出的那一步。" />
+<!-- Inline icon: without it the browser probes the Pages domain root for /favicon.ico and logs a 404. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230A0D14'/%3E%3Crect x='5' y='12' width='8' height='8' fill='%23EDEFF3'/%3E%3Crect x='13' y='12' width='8' height='8' fill='%23EDEFF3'/%3E%3Ccircle cx='9' cy='6' r='4' fill='none' stroke='%2359D49C' stroke-width='2'/%3E%3Ctext x='9' y='9' font-size='6' fill='%2359D49C' text-anchor='middle'%3E3%3C/text%3E%3C/svg%3E" />
+<link rel="stylesheet" href="css/game.css" />
+</head>
+<body data-genre="kurotto">
+<div id="app">
+  <header class="topbar">
+    <div class="brand">
+      <h1>クロット</h1>
+      <p class="sub">Kurotto · Nikoli slug <code>kurotto</code></p>
+    </div>
+    <div class="top-actions">
+      <button id="btn-theme" class="ghost" type="button" aria-pressed="false">深色</button>
+    </div>
+  </header>
+
+  <main>
+    <section id="view-menu" class="view">
+      <div class="menu-hero">
+        <h2>圈里的数字数的是「相邻的黑块有几格」，不是相邻的几个黑格</h2>
+        <p>
+          一个圈贴着一条黑块，就把那条黑块的<b>整块格数</b>记进账；贴着两条就两块相加，
+          同一个块不管被几条臂摸到都只数一次。圈格自己永远不能涂黑，
+          <b>空圈</b>（没有数字的圈）也一样不能黑，但它不限制任何事。
+          这里没有 2×2 规矩、没有黑格连通、没有白格连通——三家原文一个都没写（<code>DESIGN.md §1</code>）。
+          每一局都只有一个答案，也每一局都能靠 K1–K6 这六条命名规则推到底。
+        </p>
+      </div>
+
+      <div class="menu-cols">
+        <div class="col">
+          <h3 class="col-title">选一档</h3>
+          <div id="tier-list" class="tiers"></div>
+          <p class="menu-disclose" id="excluded-note"></p>
+          <div id="resume-card" class="resume" hidden>
+            <div class="resume-txt">
+              <strong id="resume-name">未完成的牌局</strong>
+              <span id="resume-meta"></span>
+            </div>
+            <button id="btn-resume" class="primary" type="button">继续</button>
+          </div>
+        </div>
+
+        <div class="col">
+          <h3 class="col-title">纪录（同档比：先看不求提示几次，再看步数，最后看时间）</h3>
+          <ul id="record-list" class="records"></ul>
+
+          <h3 class="col-title">你会用到的几条</h3>
+          <ol class="rules">
+            <li><b>K1 圈格不黑</b>：有数字或空着的圈，一律钉成白。</li>
+            <li><b>K2 数满邻白</b>：一个圈已经数够了，它身边未定的邻格全部钉白（再黑一格就多一格）。</li>
+            <li><b>K3 块封顶</b>：计入某圈的黑块最多只能长到那个圈剩下的名额，长满了门口就全白。</li>
+            <li><b>K4 单门必黑</b>：还差格子而能让它变大的入口只剩一个 ⇒ 那格必黑。</li>
+            <li><b>K5 候选和恰好</b>：一个圈能拿到的格子总数刚好等于数字 ⇒ 全部涂黑。</li>
+            <li><b>K6 单块必长</b>：只有一个计入块、身边再无未定邻格 ⇒ 那块必须长到数字那么多格。</li>
+          </ol>
+          <p class="rules-note">提示按的就是这六条（<code>js/engine/pencil.js</code>）：它说出的每一格，都是题面线索推得出的。</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-game" class="view" hidden>
+      <div class="stage">
+        <div class="stage-head">
+          <span id="stat-name" class="puzzle-name">—</span>
+          <span id="stat-tier" class="chip">—</span>
+          <span id="stat-seed" class="chip mono">seed —</span>
+          <span id="stat-time" class="chip mono">00:00</span>
+        </div>
+        <div id="board-wrap">
+          <canvas id="board" tabindex="0" role="img" aria-label="クロット棋盘：点一格在未定、黑、白之间循环"></canvas>
+          <div id="win-veil" hidden>
+            <div class="win-card">
+              <h3>每一条账都对上了</h3>
+              <p id="win-meta"></p>
+              <p id="win-record" class="win-record"></p>
+              <div class="win-actions">
+                <button id="btn-again" class="primary" type="button">再来一局</button>
+                <button id="btn-menu-2" class="ghost" type="button">回选档</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p id="state-line" class="conflict-line" aria-live="polite"></p>
+      </div>
+
+      <aside class="panel">
+        <div class="digits" role="group" aria-label="把选中的格钉成">
+          <button id="btn-black" class="digit black" type="button" aria-label="把这一格钉成黑">黑</button>
+          <button id="btn-white" class="digit white" type="button" aria-label="把这一格钉成白">白</button>
+          <button id="btn-clear" class="digit blank" type="button" aria-label="把这一格收回未定">清</button>
+        </div>
+        <div class="acts">
+          <button id="btn-hint" class="primary" type="button">提示<span class="mono" id="hint-count">0</span></button>
+          <button id="btn-undo" class="ghost" type="button">撤销</button>
+          <button id="btn-new" class="ghost" type="button">换一局</button>
+          <button id="btn-menu" class="ghost" type="button">回选档</button>
+        </div>
+
+        <div class="stats">
+          <div class="stat"><span>步数</span><b id="stat-moves" class="mono">0</b></div>
+          <div class="stat"><span>提示</span><b id="stat-hints" class="mono">0</b></div>
+          <div class="stat"><span>已涂黑</span><b id="stat-black" class="mono">0/0</b></div>
+          <div class="stat"><span>未定格</span><b id="stat-remaining" class="mono">0</b></div>
+          <div class="stat"><span>违反条款</span><b id="stat-conflicts" class="mono">0</b></div>
+          <div class="stat"><span>推理链长</span><b id="stat-score" class="mono">—</b></div>
+          <div class="stat"><span>这一局耗时</span><b id="stat-genms" class="mono">—</b></div>
+        </div>
+
+        <div class="hint-box">
+          <h4 id="hint-rule">提示理由</h4>
+          <p id="hint-line">按 <b>提示</b> 会说出当前能推的一格，以及它依据哪条命名规则。</p>
+        </div>
+
+        <div class="legend">
+          <span><i class="sw sw-circle"></i>数字圈</span>
+          <span><i class="sw sw-empty-circle"></i>空圈（也不能黑）</span>
+          <span><i class="sw sw-unknown"></i>未定</span>
+          <span><i class="sw sw-black"></i>黑格</span>
+          <span><i class="sw sw-white"></i>白格</span>
+          <span><i class="sw sw-bad"></i>违反条款</span>
+        </div>
+        <p class="keyhint"><b>点击/触屏</b> 循环 未定→黑→白 · <b>方向键</b> 移动 · <b>回车/空格</b> 循环 · <b>B</b> 黑 · <b>W</b> 白 · <b>0/退格</b> 清 · <b>H</b> 提示 · <b>Z</b> 撤销 · <b>N</b> 换一局</p>
+      </aside>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span>每局唯一解 · 每局可用 K1–K6 推到底 · 提示只给推得出的一步 · 同一 seed 同一档出同一张盘 — 由 <code>tools/verify.sh</code> 在真实浏览器里逐条断言。</span>
+    <button id="btn-reset" class="link" type="button">清空存档</button>
+  </footer>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

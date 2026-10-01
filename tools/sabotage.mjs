@@ -84,7 +84,9 @@ for (const k of picked) {
   writeFileSync(join(ROOT, k.file), src.slice(0, at[0]) + k.repl + src.slice(at[0] + k.needle.length));
   const t0 = Date.now();
   const r = sh(k.cmd, timeoutFor(k.cmd));
-  const named = r.out.split('\n').filter(l => l.includes(k.expect));
+  // 只 rc != 0 不算红；点名的那一行还必须是红行（**FAIL** / RED）——B7、D8 这类标签在 ok 行里也出现，
+  // 不筛就会把"标签被抄在一条通过的断言上"当成闸认出了这道刀。
+  const named = r.out.split('\n').filter(l => l.includes(k.expect) && /(FAIL|RED)/.test(l));
   const log = `_tmp-kurotto-sab-${k.id}.log`;
   writeFileSync(join(ROOT, log), `${k.cmd}\nrc=${r.rc} 用时 ${((Date.now() - t0) / 1000).toFixed(1)}s\n${'='.repeat(60)}\n${r.out}`);
   const restore = git(`checkout -- ${k.file}`);

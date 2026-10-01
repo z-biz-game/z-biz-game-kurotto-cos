@@ -9,6 +9,8 @@
 // 五条硬规矩：
 //   1. 工作树必须干净：刀打在定稿的那一份上，否则恢复那一步的 git checkout 会把在写的东西抹掉。
 //   2. 针必须唯一命中：0 次或 >1 次都是 ERROR——"打不中却一声不响跑完"是台账最坏的失败。
+//      （台账那张表自己会把针抄一遍，所以数命中的时候把 `| K… |` 那些行摘掉再数；K11 第一次跑
+//      就是被这条规矩挡住的：新加的一句说明把同一个字符串抄成了两处。）
 //   3. rc != 0 **且**输出点名了它那一条断言才算红；语法炸了也是 rc != 0，但那不是闸红。
 //   4. 每把刀只恢复它那一个文件，恢复后立刻验工作树；脏了就停，不带脏树跑下一把。
 //   5. 全部刀红完之后不带刀整跑四道闸要求全绿，只有到这一步才回写 README 的实测 rc。
@@ -50,11 +52,24 @@ const dirty = git('status --porcelain').out.trim();
 if (dirty) die(`工作树不干净，刀不能打在半成品上（先 commit 或先把这些挪开）：\n${dirty}`);
 const harness = ['tools/engine-test.mjs', 'tools/balance.mjs', 'tools/scenarios.js', 'tools/verify.sh', 'tools/doctest.mjs', 'tools/playtest.cjs']
   .map(f => ({ f, src: read(f) }));
+const target = (src, needle) => {   // 命中在哪一处：台账行自己会把针抄一遍，那些命中不算
+  const lines = src.split('\n');
+  const ledger = lines.map((l, i) => /^\| K\d+ \| /.test(l) ? i : -1).filter(i => i >= 0);
+  const isLedger = pos => {
+    let up = 0;
+    for (let i = 0; i < lines.length; i++) { up += lines[i].length + 1; if (up > pos) return ledger.includes(i); }
+    return false;
+  };
+  const at = [];
+  for (let i = src.indexOf(needle); i >= 0; i = src.indexOf(needle, i + 1)) if (!isLedger(i)) at.push(i);
+  return at;
+};
 for (const k of picked) {
   let src;
   try { src = read(k.file); } catch { die(`${k.id} 的文件不存在：${k.file}`); }
-  const hits = src.split(k.needle).length - 1;
-  if (hits !== 1) die(`${k.id} 的针在 ${k.file} 里命中 ${hits} 次（必须恰好 1 次；打不中或打多了都不许跑）`);
+  const at = target(src, k.needle);
+  const hits = at.length;
+  if (hits !== 1) die(`${k.id} 的针在 ${k.file} 的台账行之外命中 ${hits} 次（必须恰好 1 次；打不中或打多了都不许跑）`);
   if (k.repl === k.needle) die(`${k.id} 的「改成」与针相同，这一刀不会改变任何东西`);
   if (!harness.some(h => h.src.includes(k.expect))) die(`${k.id} 期望点名的「${k.expect}」在任何一道闸的源码里都找不到（断言被改名或删掉了）`);
   console.log(`  预检 ${k.id} · ${k.file} 针唯一命中 · 期望点名「${k.expect}」`);
@@ -64,7 +79,9 @@ const timeoutFor = cmd => (/verify\.sh/.test(cmd) ? 1500000 : /balance/.test(cmd
 const results = [];
 for (const k of picked) {
   const src = read(k.file);
-  writeFileSync(join(ROOT, k.file), src.replace(k.needle, k.repl));
+  const at = target(src, k.needle);
+  if (at.length !== 1) die(`${k.id} 落刀前针的命中数变成 ${at.length} 了（预检之后文件被人改过）`);
+  writeFileSync(join(ROOT, k.file), src.slice(0, at[0]) + k.repl + src.slice(at[0] + k.needle.length));
   const t0 = Date.now();
   const r = sh(k.cmd, timeoutFor(k.cmd));
   const named = r.out.split('\n').filter(l => l.includes(k.expect));

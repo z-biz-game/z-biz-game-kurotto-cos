@@ -9,7 +9,7 @@
 //   * 只比现值，不复测读数：ms、出货率、节点数这类本机测量在这里只作为「文档写的数与代码里的界」
 //     的关系出现（D5c），这里不去重跑它们（重跑归 balance，逐张复算归 engine-test）；
 //   * 文档改形状（表格列、句子措辞、引用格式）不算通过的理由：解析不到就是红。
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -254,6 +254,10 @@ for (const [file, token] of anchors) {
   }
   ok(hit, `D9b ${file}:${m ? m[1] : '?'} 真的坐着 ${token}（引用是锚点，不是装饰）`, detail);
 }
+const pathMentions = [...new Set((DOCS.match(/(?:tools|js)\/[\w./-]+\.(?:js|mjs|cjs|sh)/g) || []))];
+ok(pathMentions.length >= 8 && pathMentions.every(x => existsSync(join(ROOT, x))),
+  `D9c 文档点名的 ${pathMentions.length} 个 tools/ 与 js/ 文件都还在树里（删掉一个工具就得同时删掉提到它的话）`,
+  pathMentions.filter(x => !existsSync(join(ROOT, x))).join('，') || pathMentions.join(' '));
 
 // ---- D10 红线标签双向：文档点名的每条红线都得存在，存在的每条都得有人写 ----
 const realLabels = [...new Set((BAL.match(/'((?:B\d(?:b)?(?:-guard)?))'/g) || []).map(x => x.slice(1, -1)))];

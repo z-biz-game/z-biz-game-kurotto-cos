@@ -44,29 +44,38 @@ const PENCIL = read('js/engine/pencil.js');
 const PKG = JSON.parse(read('package.json'));
 const HTML = read('index.html');
 
-// ---- D1 菜单：在册的五档 + 请出菜单的两档，文档抄的都必须等于代码现值 ----
-const tierRows = [...README.matchAll(/^\| (初|中|高) \| (\d+)×\d+ \| 链长 med (\d+) 轮 \| 出题 med (\d+) ms \|$/gm)];
-ok(tierRows.length === TIERS.length, `D1a README 的五档表解析到 ${TIERS.length} 行（解析不到不等于通过）`,
+// ---- D1 菜单：在册的档位 + 请出菜单的档位，文档抄的都必须等于代码现值 ----
+// 表里五列：档名、尺寸、链长 med、线索 med、本机出题耗时。前两列等式由 B5 守（盘与 seed 的属性），
+// 耗时那一列在这里只比"文档 vs 代码常数"，它不印到页面上。
+const tierRows = [...README.matchAll(/^\| (初|中|高) \| (\d+)×\d+ \| 链长 med (\d+) 轮 \| 线索 med (\d+)\/(\d+) 格 \| 出题 med (\d+) ms \|$/gm)];
+ok(tierRows.length === TIERS.length, `D1a README 的档位表解析到 ${TIERS.length} 行（解析不到不等于通过）`,
   `解析 ${tierRows.length} 行 vs TIERS ${TIERS.length} 档`);
 for (const t of TIERS) {
-  const row = tierRows.find(m => +m[2] === t.n); // 档名会重复（两个「中」两个「高」），按尺寸认档
+  const row = tierRows.find(m => +m[2] === t.n); // 档名会重复（两个「中」一个「高」），按尺寸认档
   ok(!!row && row[1] === t.name, `D1 ${t.name} ${t.n}×${t.n} 那一行在文档的档位表里`,
     row ? `文档 | ${row[1]} | ${row[2]}×${row[2]} |` : '文档里没有这一档');
   ok(!!row && +row[3] === t.med.rounds, `D1b ${t.n}×${t.n} 链长 med ${t.med.rounds} 轮 == TIERS 现值`,
     row ? `文档 ${row[3]} vs 代码 ${t.med.rounds}` : '解析不到那一行');
-  ok(!!row && +row[4] === t.med.ms, `D1c ${t.n}×${t.n} 出题 med ${t.med.ms} ms == TIERS 现值`,
-    row ? `文档 ${row[4]} vs 代码 ${t.med.ms}` : '解析不到那一行');
+  ok(!!row && +row[4] === t.med.clues, `D1c ${t.n}×${t.n} 线索 med ${t.med.clues} == TIERS 现值（这一列也印在按钮上）`,
+    row ? `文档 ${row[4]} vs 代码 ${t.med.clues}` : '解析不到那一行');
+  ok(!!row && +row[5] === t.n * t.n, `D1 ${t.n}×${t.n} 那一行的线索分母是这一档自己的格数 ${t.n * t.n}`,
+    row ? `文档 ${row[4]}/${row[5]} vs 格数 ${t.n * t.n}` : '解析不到那一行');
+  ok(!!row && +row[6] === t.med.ms, `D1d ${t.n}×${t.n} 出题 med ${t.med.ms} ms == TIERS 现值`,
+    row ? `文档 ${row[6]} vs 代码 ${t.med.ms}` : '解析不到那一行');
 }
 const sizeList = (README.match(/选一档\*\*：([\d×/ ]+)。/) || [])[1];
 ok(!!sizeList && sizeList.trim().split(/\s*\/\s*/).join(' ') === TIERS.map(t => `${t.n}×${t.n}`).join(' '),
-  'D1d 玩法那一行的尺寸清单逐档等于 TIERS（正文散文里的尺寸也是现值）',
+  'D1e 玩法那一行的尺寸清单逐档等于 TIERS（正文散文里的尺寸也是现值）',
   sizeList ? `文档 ${sizeList.trim()} vs 代码 ${TIERS.map(t => `${t.n}×${t.n}`).join(' / ')}` : '解析不到尺寸清单');
+const msOnButtons = [read('js/main.js'), read('index.html')].filter(src => /class="tier-meta"/.test(src) && /ms/.test(src.match(/class="tier-meta"[^`]*/)?.[0] || ''));
+ok(msOnButtons.length === 0, `D1f 选档页按钮那一行里没有毫秒（页面上印的必须是盘与 seed 的属性）`,
+  msOnButtons.length ? `${msOnButtons.length} 个源文件把 ms 写进了 .tier-meta` : 'js/main.js 的按钮文案只有链长与线索');
 const tierCountClaims = [...DOCS.matchAll(/(?<![上这那每同换末首])([一二三四五六七八九十])档(?:（|菜单| ×|的|，|、|。)/g)].map(m => m[1]);
 ok(tierCountClaims.length >= 3 && tierCountClaims.every(w => CN[w] === TIERS.length),
-  `D1e 文档里所有「N 档」都是 ${TIERS.length} 档（中文数词也要对上）`,
+  `D1g 文档里所有「N 档」都是 ${TIERS.length} 档（中文数词也要对上）`,
   `解析 ${tierCountClaims.length} 处：${tierCountClaims.join(' ')} vs 代码 ${TIERS.length}`);
 const exclLines = [...README.matchAll(/^- (\d+)×\1 不在菜单里：(.+)$/gm)];
-ok(exclLines.length === EXCLUDED_TIERS.length, `D1f README 抄的排除条数等于 EXCLUDED_TIERS 的条数`,
+ok(exclLines.length === EXCLUDED_TIERS.length, `D1h README 抄的排除条数等于 EXCLUDED_TIERS 的条数`,
   `解析 ${exclLines.length} 条 vs 代码 ${EXCLUDED_TIERS.length} 条`);
 for (const m of exclLines) {
   const x = EXCLUDED_TIERS.find(y => y.n === +m[1]);

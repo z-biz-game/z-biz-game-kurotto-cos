@@ -9,7 +9,7 @@ import { EX_N, EX_CLUES, EX_BLACK } from '../js/engine/example.js';
 
 let fail = 0, pass = 0;
 const VERBOSE = !!process.env.VERBOSE;
-// 逐盘断言在闸里是**计数**不是日志：五档 × 12 张的"ok"会把真正要看的汇总和红灯淹掉。
+// 逐盘断言在闸里是**计数**不是日志：每一档 × 12 张的"ok"会把真正要看的汇总和红灯淹掉。
 const note = (cond, label, extra = '') => {
   if (cond) pass++;
   else { fail++; console.log(`  **FAIL** ${label}${extra ? ' · ' + extra : ''}`); }
@@ -167,16 +167,25 @@ for (const t of TIERS) {
   });
 }
 
-// ---------- 7. 菜单承诺：档位表与请出菜单的那两档 ----------
+// ---------- 7. 菜单承诺：档位表与请出菜单的那三档 ----------
 console.log('菜单与预算');
-ok(TIERS.map(t => t.n).join(',') === '6,7,8,9,10', '菜单五档 6/7/8/9/10', TIERS.map(t => t.n).join(','));
-ok(EXCLUDED_TIERS.map(t => t.n).join(',') === '12,14', '12×12 与 14×14 被请出菜单且带理由', EXCLUDED_TIERS.map(t => `${t.n}:${t.reason.length > 20}`).join(' '));
+ok(TIERS.map(t => t.n).join(',') === '6,7,8,9', '菜单四档 6/7/8/9（10×10 越过等待线之后下来了）', TIERS.map(t => t.n).join(','));
+ok(EXCLUDED_TIERS.map(t => t.n).join(',') === '10,12,14', '10×10 与 12×12、14×14 被请出菜单且带理由', EXCLUDED_TIERS.map(t => `${t.n}:${t.reason.length > 20}`).join(' '));
+// 菜单与排除表不许有同一尺寸：选档页把两张表都印出去，重复一格就是同一档既在卖又被判了出局。
+ok(EXCLUDED_TIERS.every(x => !TIERS.some(t => t.n === x.n)), '排除表里的尺寸都不在菜单上（两张表不许相交）',
+  EXCLUDED_TIERS.map(x => x.n).join(','));
 // obs 的六个读数一个都不能少：balance 的 B7 是逐条对账的，少登记一条就是那一盏常绿的灯。
 ok(EXCLUDED_TIERS.every(t => t.obs && ['samples', 'rounds', 'clues', 'cells', 'cut', 'nodes'].every(k => Number.isInteger(t.obs[k]))),
   '请出菜单的每一档都登记了完整的 obs 读数', EXCLUDED_TIERS.map(t => `${t.n}:${t.obs ? Object.keys(t.obs).join('+') : 'no obs'}`).join(' '));
-// 页面上的理由句是给玩家看的：墙钟毫秒是这台机器的速度，写进理由就成了没人能复核的承诺。
-ok(EXCLUDED_TIERS.every(t => !/\d+(?:\.\d+)?ms/.test(t.reason)), '排除理由里不拿墙钟毫秒当理由',
-  EXCLUDED_TIERS.map(t => t.n).join(','));
+// 选档页的按钮印的是链长与线索两个中位：少登记一个，页面上就是 undefined/36 这种字。
+ok(TIERS.every(t => Number.isInteger(t.med.rounds) && Number.isInteger(t.med.clues) && t.med.clues < t.n * t.n),
+  '菜单每一档都登记了要印到按钮上的链长与线索中位', TIERS.map(t => `${t.n}:${JSON.stringify(t.med)}`).join(' '));
+// 页面上的理由句是给玩家看的：墙钟（毫秒或"几秒"）是这台机器的速度，写进理由就成了没人能复核的承诺。
+ok(EXCLUDED_TIERS.every(t => !/[\d.]+(?:ms|秒)/.test(t.reason)), '排除理由里不拿墙钟当理由（毫秒与"几秒"都不行）',
+  EXCLUDED_TIERS.map(t => `${t.n}:${/[\d.]+(?:ms|秒)/.test(t.reason) ? '有墙钟' : '干净'}`).join(' '));
+// 分母要在句子里：中位数没有张数就只是一个数，B7 拿它去比同批的末档。
+ok(EXCLUDED_TIERS.every(t => t.reason.includes(`同一批 ${t.obs.samples} 张`)), '排除理由自己带着分母',
+  EXCLUDED_TIERS.map(t => `${t.n}:${t.obs.samples} 张`).join(' '));
 ok(BUDGET.cap === NODE_CAP && BUDGET.callNodes === 5000 && BUDGET.digNodes === 120000 && BUDGET.order === 'near',
   '出题预算：单次 5000 节点 / 每盘挖 120000 节点 / near 挑格 / 承诺预算 2000000 节点', JSON.stringify(BUDGET));
 ok(BUDGET.timeMs === undefined && BUDGET.digMs === undefined,
@@ -260,7 +269,7 @@ console.log('提示逐格');
 // 自数：README 的「测试过程与结果」印的就是这个条数，而条数会随断言增删悄悄漂——
 // 文档里那句"引擎闸 N 项"一旦是上一个世界的数，它就不再是证据而是装饰。
 // 钉成常数之后，加/删断言的人必须同时改这里和 README；doctest 的 D11 把三方对上。
-const EXPECT_TOTAL = 347;
+const EXPECT_TOTAL = 288;
 ok(pass + 1 === EXPECT_TOTAL, `断言条数等于登记的 ${EXPECT_TOTAL} 条（这一条自己也算在内）`, `实测 ${pass + 1} 条`);
 
 console.log(`\n合计 ${pass} 项通过，${fail} 项失败`);

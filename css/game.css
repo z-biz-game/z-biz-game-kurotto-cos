@@ -125,7 +125,10 @@ main { padding-top: 18px; }
 .digit.blank { background: var(--panel-2); color: var(--ink-dim); font-weight: 500; }
 .acts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .acts .primary { grid-column: 1 / -1; }
-#hint-count { margin-left: 6px; background: rgba(0, 0, 0, .18); border-radius: 999px; padding: 1px 8px; font-size: 12px; }
+/* 计数徽标不吃指针：它是按钮的字，不是一个控件。指针闸在按钮中心做 elementFromPoint 并要求
+   命中的就是按钮本身——CI 那台机器的字体度量更窄，徽标压住了中心点，于是同一条断言在本机绿、
+   在 runner 红。徽标让位之后这条断言不再依赖任何一台机器的字宽。 */
+#hint-count { margin-left: 6px; background: rgba(0, 0, 0, .18); border-radius: 999px; padding: 1px 8px; font-size: 12px; pointer-events: none; }
 
 .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; padding: 12px; background: var(--panel-2); border-radius: 12px; }
 .stat { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--ink-dim); }

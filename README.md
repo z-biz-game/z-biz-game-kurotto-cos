@@ -10,7 +10,8 @@
 
 ## 玩法
 
-- **选一档**：6×6 / 7×7 / 8×8 / 9×9 / 10×10。档名（初/中/高）旁边印的是**实测链长**，不是形容词。
+- **选一档**：6×6 / 7×7 / 8×8 / 9×9。档名（初/中/高）旁边印的是**实测链长**与**实测线索格数**，
+  不是形容词，也不印耗时（同一份代码在 CI 那台机器上量到本机的 2.4 倍，秒数没有一台机器能替它签字）。
 - **点一格**循环 未定 → 黑 → 白；也可以用右边的「黑 / 白 / 清」三个键直接定格。
 - **数字圈永远不能涂黑**，**空圈**（没有数字的圈）也一样不能黑，但它不限制任何事。
   页面上圈格点不动不是 bug：那是规则，`hint` 腿专门断言"提示从不落在圈格上"。
@@ -51,27 +52,30 @@
 - **唯一解不告诉你**：盘面不会显示"还剩几个解"。本仓的承诺是每张出货盘都被穷举计数器在节点预算内
   数到恰好 1 解——你推不动的时候，问题在推法不在题面。
 
-## 菜单五档（链长是量出来的）
+## 菜单四档（链长与线索密度是量出来的）
 
-`| 档 | 尺寸 | 实测链长 | 本机出题耗时 |` —— 链长那一列是**等式**（B5 每次复跑逐档核对，漂了就红），
-耗时那一列只是这台机器的读数，闸只卡"逐档变慢"这个方向（B5b）。下面四列逐字等于
-`js/engine/generate.js:15 的 TIERS`：
+`| 档 | 尺寸 | 实测链长 | 实测线索 | 本机出题耗时 |` —— 链长与线索那两列是**等式**（B5 每次复跑逐档核对，
+漂了就红，因为它们只由盘面与 seed 决定）；耗时那一列只是这台机器的读数，闸只卡"逐档变慢"这个方向（B5b），
+它也不印到选档页上。下面这张表逐字等于 `js/engine/generate.js:17 的 TIERS`：
 
-| 档 | 尺寸 | 实测链长 | 本机出题耗时 |
-| --- | --- | --- | --- |
-| 初 | 6×6 | 链长 med 8 轮 | 出题 med 9 ms |
-| 中 | 7×7 | 链长 med 11 轮 | 出题 med 26 ms |
-| 中 | 8×8 | 链长 med 12 轮 | 出题 med 72 ms |
-| 高 | 9×9 | 链长 med 14 轮 | 出题 med 215 ms |
-| 高 | 10×10 | 链长 med 18 轮 | 出题 med 636 ms |
+| 档 | 尺寸 | 实测链长 | 实测线索 | 本机出题耗时 |
+| --- | --- | --- | --- | --- |
+| 初 | 6×6 | 链长 med 8 轮 | 线索 med 10/36 格 | 出题 med 9 ms |
+| 中 | 7×7 | 链长 med 11 轮 | 线索 med 13/49 格 | 出题 med 26 ms |
+| 中 | 8×8 | 链长 med 12 轮 | 线索 med 17/64 格 | 出题 med 72 ms |
+| 高 | 9×9 | 链长 med 14 轮 | 线索 med 20/81 格 | 出题 med 215 ms |
 
-**12×12 与 14×14 被请出菜单**，理由印在选档页上、由 B7 逐条与本次实测对账（`DESIGN.md §5`）：
+**10×10、12×12、14×14 被请出菜单**，理由印在选档页上、由 B7 逐条与本次实测对账（`DESIGN.md §5`）。
+每条理由自己带着分母（"同一批 N 张"），而且比较对象是末档在**同一批张数**上的重算值——链长中位随张数漂
+（9×9 在 5 张流上读 18 轮，在菜单那 20 张里读 14 轮），拿两条不同分母的流相比就造得出假话：
 
-- 12×12 不在菜单里：链长 med 19 轮，只比菜单末档 18 轮多 1 轮；线索还有 38/144 格，密度反而比末档的 25/100 更高——盘大了一圈，买到的不是更长的推理，是一张更厚的题面和更久的等待
-- 14×14 不在菜单里：挖线索的每盘节点预算掐了 4/5 盘，出的是没挖开的厚线索盘（线索 53/196 格，比末档的 25/100 还密）；链长 med 20 轮也只比末档 18 轮多 2 轮
+- 10×10 不在菜单里：同一批 20 张里链长 med 18 轮确实比末档量到的 14 轮多出 4 轮，深度是买到了；但题面没有变薄（线索 25/100 格，末档同批 20/81），每张的出题节点 med 28146 是末档同批的 2.6 倍，挖线索的每盘预算还掐了 1/20 盘——按一次的搜索量付账买到的不是更薄的盘，而我们没法对一台猜不到的机器承诺这一档的等待
+- 12×12 不在菜单里：同一批 5 张里链长 med 19 轮只比末档多 1 轮，线索还有 38/144 格，密度不降反升，出题节点 med 36250 是末档同批的 2.0 倍——盘大了一圈，买到的是一张更厚的题面和成倍的搜索量，而不是更长的推理
+- 14×14 不在菜单里：同一批 5 张里挖预算掐了 4/5 盘，出的是没挖开的厚线索盘（53/196 格，密度比末档同批还高）；链长 med 20 轮只比末档多 2 轮，出题节点 med 124727 却是末档同批的 6.9 倍——深度只挪了一点，成本却要看预算脸色
 
-等待的承诺是「换一局之后 p95 ≤ 4000 ms」（B1 的绝对线）。越线的那一档被请出菜单，**这条线本身
-一个字不挪**——挪线就是拿玩家的等待换尺寸。
+等待的承诺是「换一局之后 p95 ≤ 4000 ms」（B1 的绝对线）。10×10 就是被这一条请出去的：它在本机没过线，
+在 CI 那台 2 vCPU 上 p95 过线了。**这条线本身一个字不挪**——挪线就是拿玩家的等待换尺寸（线有没有被挪，
+由 D5d 拿文档那句与 `COST_MS` 对账）。
 
 ## 测试过程与结果
 
@@ -79,14 +83,14 @@
 
 | 闸 | 挡在哪 | 没挡住什么 |
 | --- | --- | --- |
-| `node tools/engine-test.mjs` | 347 条等式：唯一解、0 猜推满、两路逐格会合、R4 三遍写法对账、计数器 vs 傻跑、seed 跨速度确定性、预算、两路独立性、提示逐格。条数钉在 `tools/engine-test.mjs:263 的 EXPECT_TOTAL` | 它跑在 node 里：页面接线、DOM 文案、画布像素错了它照样绿——那一段归 `core/play/win` 三条腿 |
-| `node tools/balance.mjs` | 五档 × 20 张的实测：等待（B1）、出货率（B2）、阶梯（B3/B3b）、页面数字（B5/B5b）、规则开火（B6）、排除档位（B7）。那条等待线写在 `tools/balance.mjs:43 的 COST_MS` | 它自己从不撒车，所以"多解盘上铅笔不许自称推满"这条要靠 `B4` 自带的那台撒车反面样本机（`B4-guard` 就是数它到底撒了几盘）；难度读数再准也不知道渲染对不对 |
+| `node tools/engine-test.mjs` | 288 条等式：唯一解、0 猜推满、两路逐格会合、R4 三遍写法对账、计数器 vs 傻跑、seed 跨速度确定性、预算、两路独立性、提示逐格。条数钉在 `tools/engine-test.mjs:272 的 EXPECT_TOTAL` | 它跑在 node 里：页面接线、DOM 文案、画布像素错了它照样绿——那一段归 `core/play/win` 三条腿 |
+| `node tools/balance.mjs` | 四档 × 20 张的实测：等待（B1）、出货率（B2）、阶梯（B3/B3b）、页面数字（B5/B5b）、规则开火（B6）、排除档位（B7）。那条等待线写在 `tools/balance.mjs:43 的 COST_MS` | 它自己从不撒车，所以"多解盘上铅笔不许自称推满"这条要靠 `B4` 自带的那台撒车反面样本机（`B4-guard` 就是数它到底撒了几盘）；难度读数再准也不知道渲染对不对 |
 | `bash tools/verify.sh` | 真 Chrome + 裸 CDP：DOM 文本、几何、画布像素、真输入事件、存档与续局。条数逐份登记在 `tools/verify.sh:82 的 EXPECTS` | 它只认这台 Chrome：别的引擎的字体度量/滚动条不在射程内；也不知道这一盘"难不难"（那是 balance 的话） |
 | `node tools/doctest.mjs` | 本文档与 `DESIGN.md` 里每个"现值"的等式（D1–D13） | 它只比"文档 vs 代码常数 / 脚本现值"，不复测任何墙钟读数；散文里那句"为什么"它管不着——那些理由各自的台架写在 `DESIGN.md §7` |
 
 浏览器那份逐报告的条数（与 `tools/verify.sh:82 的 EXPECTS` 一格一格相同，闸跑完当场对数）：
-engine 21 / gen 41 / play 30 / hint 16 / win 20 / layout 26 / mouseleg 41 / touchleg 44 / keysleg 26 / save 22 / fragleg 4 / resume 15 / reloadleg 4 / corrupt 16，
-每形态 326 条 · 合计 652 条。
+engine 21 / gen 38 / play 30 / hint 16 / win 20 / layout 26 / mouseleg 41 / touchleg 44 / keysleg 26 / save 22 / fragleg 4 / resume 15 / reloadleg 4 / corrupt 16，
+每形态 323 条 · 合计 646 条。
 
 `balance.mjs` 的红线（每条都是实测，不是文案）：
 
@@ -95,14 +99,14 @@ engine 21 / gen 41 / play 30 / hint 16 / win 20 / layout 26 / mouseleg 41 / touc
 | `B1` | 每张 p95 ≤ 4000 ms：承诺给玩家的是"按换一局之后最多等多久"，所以咬 p95 不咬中位 |
 | `B2` | 出货率 100%：菜单里的一档必须每一张都出得来，"偶尔出不了盘"不是这一档的承诺 |
 | `B3` | 链长 med 逐档不减，且首档 < 末档（阶梯不能是平的） |
-| `B3b` | 末档 med > 首档最长的那一张：往上一档买到的东西要能量到 |
+| `B3b` | 末档的 p95 比首档**最长的那一张**还长，且链长 p95 逐档严格变长：往上一档买到的东西要能量到（10×10 下来之后这句靠尾巴撑着，不靠 med） |
 | `B4` | 铅笔不说谎：在证过多解的盘上，铅笔声称"推满"的次数必须为 0 |
 | `B4-guard` | 反面样本 ≥ 3 盘：没有多解样本时 `B4` 是一盏常绿的灯 |
-| `B5` | 选档页印的链长 med == 本次实测（等式，逐档） |
-| `B5b` | 页印耗时只卡方向：逐档变慢（ms 是机器速度，写成等式就会随负载变红） |
+| `B5` | 选档页印的链长 med 与线索 med == 本次实测（等式，逐档；这两个数只由盘与 seed 决定） |
+| `B5b` | 页印耗时只卡方向：逐档变慢（ms 是机器速度，写成等式就会随负载变红；它现在也不印到页面上） |
 | `B6` | 六条命名规则每一档都真的开过火：挂着名字但整档不开火的规则是装饰 |
 | `B6-guard` | 规则表 6 条，与本文的六条一致 |
-| `B7` | 请出菜单的档位：obs 四个读数逐条等式 + 理由句里引用的末档那两个数回到实测 |
+| `B7` | 请出菜单的档位：obs 读数逐条等式 + 末档在**同一批张数**上重测，理由句里"同一批 N 张""多 N 轮""末档同批的 X.X 倍""掐了 k/N 盘"逐条回到重算值；句子里出现墙钟（毫秒或"几秒"）即红 |
 
 **阴性自证**：`GATE_SELFTEST=1 bash tools/verify.sh` 给每份报告种一条注定错的期望，必须 rc 非 0
 并且 28/28 份报告点名吃下自己那条红（对数分母由 `LEGS` 推出来，"腿没跑"与"跑了没红"分得开）。
@@ -117,9 +121,10 @@ engine 21 / gen 41 / play 30 / hint 16 / win 20 / layout 26 / mouseleg 41 / touc
 | 判据 1 的预算是 2000000 节点，单次计数调用 5000 节点，每盘挖线索 120000 节点 | `engine-test` · `D5` | 文档抄的数与代码里的常数分家即红 |
 | 提示只给推得出的那一步 | `engine-test` · `verify.sh:hint` | 按了不落子、或说不出依据哪条规则，即红 |
 | 同一 (档位, seed) 任何机器同一张盘 | `engine-test` · `verify.sh:gen` | 慢机器对照与跨引擎 golden 哈希任一处即红 |
-| 换一局 p95 等待 ≤ 4000 ms | `B1` | 那一档请出菜单，线不挪 |
-| 菜单五档的链长阶梯是真的 | `B3` · `B3b` · `B5` | 实测与页印分家、或阶梯被压平即红 |
-| 选档页那句排除理由今天还成立 | `B7` | obs 与实测分家、或理由句抄了末档的旧数即红 |
+| 换一局 p95 等待 ≤ 4000 ms | `B1` | 那一档请出菜单，线不挪；线有没有被挪由 `D5d` 拿文档那句与 `COST_MS` 对账 |
+| 菜单四档的链长阶梯是真的 | `B3` · `B3b` · `B5` | 实测与页印分家、或阶梯被压平即红 |
+| 选档页那句排除理由今天还成立 | `B7` | obs 与实测分家、理由句抄了别的批次的末档数、或句里没有分母即红 |
+| 选档页的按钮不印墙钟 | `verify.sh:gen` · `engine-test` | 按钮文案与 TIERS 的链长/线索分家、或理由句里冒出毫秒与"几秒"即红 |
 | 六条规则都不是装饰 | `B6` · `B6-guard` | 某档整档不开火即红 |
 | 页面上的数字与存档/seed 不说谎 | `verify.sh:play` · `verify.sh:save` · `verify.sh:resume` | DOM 文本与状态机分家即红 |
 | 存档恢复不自动开局、坏档不崩 | `verify.sh:corrupt` · `verify.sh:reloadleg` | 六种坏 payload 任一让页面报错即红 |
@@ -133,7 +138,8 @@ engine 21 / gen 41 / play 30 / hint 16 / win 20 / layout 26 / mouseleg 41 / touc
 ```bash
 node tools/engine-test.mjs            # 引擎闸
 node tools/balance.mjs                # 实测台架（本机默认 20 张；CI 用 SAMPLES=20 跑 balance.mjs）
-node tools/balance.mjs 6              # 只想快点看一眼时给小样本，红线数会跟着分母变
+node tools/balance.mjs 6              # 只想快点看一眼时给小样本：页面数字那几条等式会跟着分母漂（B5 是拿
+                                      # 20 张的读数当现值的），而 B7 不吃 SAMPLES——它按每一档自己登记的张数重测
 bash tools/verify.sh                  # 真浏览器闸（自己起 server，两条 URL 形态）
 LEGS="play win" bash tools/verify.sh  # 单跑几条腿
 GATE_SELFTEST=1 bash tools/verify.sh  # 阴性自证：必须红，且 rc 非 0
@@ -177,14 +183,15 @@ CI 里没有任何 `npm install`：这仓零运行时依赖，拉一个打包器
 | K1 | 判据 1 的账改成"数邻格有几个黑格"（R4 退回 R1） | `js/engine/rules.js` | `seen.add(comp[j]); got += sizes[comp[j]];` | `seen.add(comp[j]); got += 1;` | `官方解答在 R4 下合法` | `node tools/engine-test.mjs` | 1 |
 | K2 | 铅笔 K4 放宽成"有门口就涂黑"（开始猜） | `js/engine/pencil.js` | `if (a.counted < v && a.gates.size === 1) { put([...a.gates][0], BLACK, RULES[3]); step(); }` | `if (a.counted < v && a.gates.size >= 1) { put([...a.gates][0], BLACK, RULES[3]); step(); }` | `官方例题铅笔 0 猜推满` | `node tools/engine-test.mjs` | 1 |
 | K3 | 把墙钟混进 seed（"同一档同一 seed 同一张盘"就此作废） | `js/engine/rng.js` | `let a = seed >>> 0;` | `let a = (seed ^ Date.now()) >>> 0;` | `同 seed 两次生成逐格相同` | `node tools/engine-test.mjs` | 1 |
-| K4 | 选档页的链长抄错一格 | `js/engine/generate.js` | `med: { rounds: 18, ms: 636 }` | `med: { rounds: 17, ms: 636 }` | `B5` | `node tools/balance.mjs` | 1 |
-| K5 | 排除理由抄回废弃的墙钟读数 | `js/engine/generate.js` | `链长 med 19 轮，只比菜单末档 18 轮多 1 轮` | `每张 p95 4938ms 越过 4000ms 的等待承诺` | `B7` | `node tools/balance.mjs` | 1 |
-| K6 | 把请出菜单的 12×12 塞回菜单 | `js/engine/generate.js` | `{ n: 10, label: '10×10', name: '高', pBlack: 0.34, med: { rounds: 18, ms: 636 } },` | `{ n: 10, label: '10×10', name: '高', pBlack: 0.34, med: { rounds: 18, ms: 636 } },\n  { n: 12, label: '12×12', name: '高', pBlack: 0.34, med: { rounds: 19, ms: 1932 } },` | `B1` | `node tools/balance.mjs` | 1 |
-| K7 | 续局卡把"格已钉"改文案（界面与状态机分家） | `js/main.js` | `格已钉 · seed` | `格钉住 · seed` | `续局卡点名了已钉格数、seed 与提示次数` | `LEGS=save bash tools/verify.sh` | 1 |
-| K8 | 画布重新拿自己当尺子（越画越大那个缺陷） | `js/render/board.js` | `const avail = Math.min((availPx \|\| 640) - WRAP_CHROME, CELL_TARGET * n + 2);` | `const avail = Math.min((canvas.parentElement.clientWidth \|\| 640) - WRAP_CHROME, CELL_TARGET * n + 2);` | `尺子不是画布自己` | `LEGS=win bash tools/verify.sh` | 1 |
-| K9 | 对数表自己漂一格 | `tools/verify.sh` | `engine=21 gen=41` | `engine=20 gen=41` | `对数表写` | `LEGS=core bash tools/verify.sh` | 1 |
-| K10 | 种下的红不再种（阴性自证变装饰） | `tools/scenarios.js` | `if (w.__selftest) rows.push({ test: 'GATE_SELFTEST 种下的错期望（1 应当等于 2）', pass: 1 === 2, detail: 'planted red' });` | `if (false) rows.push({ test: 'GATE_SELFTEST 种下的错期望（1 应当等于 2）', pass: 1 === 2, detail: 'planted red' });` | `没有种下的错期望` | `GATE_SELFTEST=1 LEGS=play bash tools/verify.sh` | 1 |
-| K11 | 文档抄的逐报告条数与对数表分家 | `README.md` | `engine 21 / gen 41` | `engine 20 / gen 41` | `D8` | `node tools/doctest.mjs` | 1 |
+| K4 | 选档页的链长抄错一格 | `js/engine/generate.js` | `med: { rounds: 14, clues: 20, ms: 215 }` | `med: { rounds: 13, clues: 20, ms: 215 }` | `B5` | `node tools/balance.mjs` | ? |
+| K5 | 排除理由抄回废弃的墙钟读数 | `js/engine/generate.js` | `链长 med 19 轮只比末档多 1 轮` | `每张 p95 4938ms 越过 4000ms 的等待承诺` | `B7` | `node tools/balance.mjs` | ? |
+| K6 | 把请出菜单的 12×12 塞回菜单，抄着它那一批 5 张的读数 | `js/engine/generate.js` | `{ n: 9, label: '9×9', name: '高', pBlack: 0.34, med: { rounds: 14, clues: 20, ms: 215 } },` | `{ n: 9, label: '9×9', name: '高', pBlack: 0.34, med: { rounds: 14, clues: 20, ms: 215 } },\n  { n: 12, label: '12×12', name: '高', pBlack: 0.34, med: { rounds: 19, clues: 38, ms: 1932 } },` | `B5` | `node tools/balance.mjs` | ? |
+| K7 | 续局卡把"格已钉"改文案（界面与状态机分家） | `js/main.js` | `格已钉 · seed` | `格钉住 · seed` | `续局卡点名了已钉格数、seed 与提示次数` | `LEGS=save bash tools/verify.sh` | ? |
+| K8 | 画布重新拿自己当尺子（越画越大那个缺陷） | `js/render/board.js` | `const avail = Math.min((availPx \|\| 640) - WRAP_CHROME, CELL_TARGET * n + 2);` | `const avail = Math.min((canvas.parentElement.clientWidth \|\| 640) - WRAP_CHROME, CELL_TARGET * n + 2);` | `尺子不是画布自己` | `LEGS=win bash tools/verify.sh` | ? |
+| K9 | 对数表自己漂一格 | `tools/verify.sh` | `engine=21 gen=38` | `engine=20 gen=38` | `对数表写` | `LEGS=core bash tools/verify.sh` | ? |
+| K10 | 种下的红不再种（阴性自证变装饰） | `tools/scenarios.js` | `if (w.__selftest) rows.push({ test: 'GATE_SELFTEST 种下的错期望（1 应当等于 2）', pass: 1 === 2, detail: 'planted red' });` | `if (false) rows.push({ test: 'GATE_SELFTEST 种下的错期望（1 应当等于 2）', pass: 1 === 2, detail: 'planted red' });` | `没有种下的错期望` | `GATE_SELFTEST=1 LEGS=play bash tools/verify.sh` | ? |
+| K11 | 文档抄的逐报告条数与对数表分家 | `README.md` | `engine 21 / gen 38` | `engine 20 / gen 38` | `D8` | `node tools/doctest.mjs` | ? |
+| K12 | 把耗时印回选档页的按钮上（页面那一头的墙钟回归） | `js/main.js` | `<span class="tier-meta">${t.name} · 实测链长 med ${t.med.rounds} 轮 · 线索 med ${t.med.clues}/${t.n * t.n} 格</span>` | `<span class="tier-meta">${t.name} · 实测链长 med ${t.med.rounds} 轮 · 线索 med ${t.med.clues}/${t.n * t.n} 格 · ${t.med.ms} ms</span>` | `D1f` | `node tools/doctest.mjs` | ? |
 
 这里没有一把刀去拆出货前的两道复核（`挖完反而不唯一` / `出货盘铅笔推不满`）：出题器的每道守卫背后还压着下一道，
 拆掉上面那道只会让下一道把盘拦下来，坏盘根本到不了闸面前——这类"拆了照样绿"的刀不是台账的功，它证明的是纵深。

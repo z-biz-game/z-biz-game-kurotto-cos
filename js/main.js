@@ -60,7 +60,9 @@ function renderMenu() {
     b.type = 'button';
     b.className = 'tier' + (state && state.g.tier === t.n && !el.game.hidden ? ' on' : '');
     b.dataset.n = String(t.n);
-    b.innerHTML = `<b>${t.label}</b><span class="tier-meta">${t.name} · 实测链长 med ${t.med.rounds} 轮 / ${t.med.ms} ms</span>`;
+    // 按钮上只印盘与 seed 的属性（链长、线索格数）：耗时曾在这里印成"每档 med N ms"，
+    // 而同一份代码在 CI 那台机器上量出来是 2.4 倍——印出去的秒数没有一台机器能替它签字。
+    b.innerHTML = `<b>${t.label}</b><span class="tier-meta">${t.name} · 实测链长 med ${t.med.rounds} 轮 · 线索 med ${t.med.clues}/${t.n * t.n} 格</span>`;
     b.addEventListener('click', () => { startGame(t.n, nextSeed()); });
     el.tiers.appendChild(b);
   }

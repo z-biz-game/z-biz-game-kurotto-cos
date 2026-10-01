@@ -89,7 +89,7 @@ export function countSolutionsDumb(B, limit = Infinity) {
 //   maxc(c)    把「还能变黑的格」（未定 ∪ 已黑）连成块，凡含 c 的邻格的块整块大小求和 ⇒ contrib 的上界。
 //   contrib > v 或 maxc < v ⇒ 这支没有解；contrib == v ⇒ 触到这些块的未定格必须白；maxc == v ⇒ 必须黑。
 // 预算只有节点一个维度：把墙钟放进 stopped 的判定里，同一个 seed 在快慢不同的机器上会出不同的盘
-// （实测同 seed 复跑两次，10×10 的 p10 链长从 10 轮漂到 12 轮），那"同 seed 同盘"就是谎话。
+// （engine-test 的"每次读表 +250ms 的慢机器"那组就是钉这件事的）。
 export function countSolutions(B, opts = {}) {
   const cap = opts.cap ?? NODE_CAP;
   const t0 = Date.now();   // 只用来报 ms：墙钟不进任何判定

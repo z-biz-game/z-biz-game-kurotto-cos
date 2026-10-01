@@ -79,7 +79,7 @@ LEGS=${LEGS:-core play win mouse touch keys save}
 # 为什么在闸里数：条数是跑出来的读数，只写在文档上就会随代码漂——加了断言、删了断言，文档还在报
 # 上一个世界的数，而"文档自己加起来等于自己"那道恒等式照样绿。这里数一次，文档那侧才有分母。
 # GATE_SELFTEST 那一种多一条种下的红，所以下面按 +1 比。
-EXPECTS='engine=21 gen=41 play=30 hint=16 win=20 layout=26 mouseleg=41 touchleg=44 keysleg=26 save=22 fragleg=4 resume=15 reloadleg=4 corrupt=16'
+EXPECTS='engine=21 gen=38 play=30 hint=16 win=20 layout=26 mouseleg=41 touchleg=44 keysleg=26 save=22 fragleg=4 resume=15 reloadleg=4 corrupt=16'
 export EXPECTS
 
 leg_start() {   # $1 = leg name, $2 = base url

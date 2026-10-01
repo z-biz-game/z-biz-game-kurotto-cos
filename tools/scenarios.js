@@ -137,7 +137,7 @@
   // ---------- gen：出题器在页面里出的每张盘都要过两条判据 ----------
   async function gen() {
     const R = ENG().rules, T = K().TIERS;
-    eq('菜单是五档 6/7/8/9/10', T.map((t) => t.n).join(','), '6,7,8,9,10');
+    eq('菜单是四档 6/7/8/9', T.map((t) => t.n).join(','), '6,7,8,9');
     const perTier = [];
     for (const t of T) {
       let shipped = 0, provedUnique = 0, filledByPencil = 0, met = 0, dug = 0, worstNodes = 0;
@@ -182,10 +182,14 @@
       if (x.obs.cut > 0) need.push(`掐了 ${x.obs.cut}/${x.obs.samples} 盘`);
       else ck(`${x.n}×${x.n} 的挖预算一次没掐过，理由里就不许说"掐"`, !/掐/.test(x.reason), x.reason.slice(0, 90));
       eq(`${x.n}×${x.n} 的理由句逐条带上它自己的 obs 读数`, need.filter((s) => x.reason.indexOf(s) < 0).join(' | '), '');
-      ck(`${x.n}×${x.n} 的理由不拿墙钟毫秒当理由（那是这台机器的速度，不是这一档的属性）`, !/\d+(?:\.\d+)?ms/.test(x.reason), x.reason.slice(0, 90));
+      ck(`${x.n}×${x.n} 的理由不拿墙钟当理由（毫秒与"几秒"都不行；那是这台机器的速度，不是这一档的属性）`, !/[\d.]+(?:ms|秒)/.test(x.reason), x.reason.slice(0, 90));
     }
-    eq('菜单五档在页面上有五个按钮', document.querySelectorAll('#tier-list .tier').length, 5);
-    eq('每一档都把自己实测的链长印在按钮上', document.querySelectorAll('#tier-list .tier .tier-meta').length, 5);
+    eq(`菜单 ${T.length} 档在页面上有 ${T.length} 个按钮`, document.querySelectorAll('#tier-list .tier').length, T.length);
+    // 按钮那一行是给玩家挑档用的：印的必须是盘与 seed 的属性（链长、线索格数）。这一条同时是
+    // "页面退出墙钟"的闸——耗时曾经印在这里，而同一份代码在另一台机器上量到 2.4 倍。
+    eq('每个按钮印的就是那一档 TIERS 里的链长与线索中位（没有毫秒）',
+      [...document.querySelectorAll('#tier-list .tier .tier-meta')].map((m) => m.textContent.trim()).join(' | '),
+      T.map((t) => `${t.name} · 实测链长 med ${t.med.rounds} 轮 · 线索 med ${t.med.clues}/${t.n * t.n} 格`).join(' | '));
     return { scenario: 'gen', perTier };
   }
 
@@ -501,7 +505,7 @@
     eq('开机停在选档页', shown('#view-menu'), 'true');
     eq('续局卡没有出现', shown('#resume-card'), 'false');
     eq('加载期没有未捕获错误', bootErrors.length, 0);
-    eq('坏档没把菜单改小', document.querySelectorAll('#tier-list .tier').length, 5);
+    eq('坏档没把菜单改小', document.querySelectorAll('#tier-list .tier').length, K().TIERS.length);
     eq('坏档之后规则表还是 6 条', K().RULES.length, 6);
 
     const flavors = [

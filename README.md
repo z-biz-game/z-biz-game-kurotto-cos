@@ -187,6 +187,13 @@ CI 里没有任何 `npm install`：这仓零运行时依赖，拉一个打包器
 台账把 rc 读回来写进本文件：`实测 rc` 那一格被回写成什么，就只可能是刀真的打出来的那个数。
 哪把刀没红，文件就保持原样并报错——这一节因此不能靠"抄一个好看的数"通过。
 
+CI 与 `npm run sabotage` 跑的是同一张表的 `GATE=1` 那条腿，它报的是「逼红且点名 9 把 · 浏览器腿延后 4 把」，
+并且要求这张表 13 格的 `实测 rc` 逐格等于刚打回来的数（延后不等于放过：那四把的针与期望点名照旧逐条预检，
+只是这个 job 里没有 Chrome，打它们只会得到"起不来"的 rc=2）。这条腿本轮的读数住在 `_tmp-kurotto-sab-gate1.log`
+（末行 `GATE_RC=0`）；被延后的那四把，它们那一格来自带 Chrome 的本地整跑，逐把证据是
+`_tmp-kurotto-sab-K7.log` … `_tmp-kurotto-sab-K10.log`（各自 `rc=1`）与四份 `_tmp-kurotto-sab-control-*.log`
+（不带刀整跑四道闸，各自 `GATE_RC=0`）。
+
 | 刀 | 打在哪 | 文件 | 针（原文） | 改成 | 期望点名 | 命令 | 实测 rc |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | K1 | 判据 1 的账改成"数邻格有几个黑格"（R4 退回 R1） | `js/engine/rules.js` | `seen.add(comp[j]); got += sizes[comp[j]];` | `seen.add(comp[j]); got += 1;` | `官方解答在 R4 下合法` | `node tools/engine-test.mjs` | 1 |

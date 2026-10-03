@@ -107,6 +107,47 @@ function startGame(n, seed) {
   startClock();
 }
 
+/**
+ * 重开**本题**：玩家发现这一局走错了，原地推倒重来 —— 盘面与 seed 都不变。
+ *
+ * 本仓的形态是「工厂 + 一层 UI 状态」：G.newGame(n, seed) 造出题面与玩家标记
+ * （g.marks / g.sel / g.flash / g.moves / g.hints / g.elapsed / g._trace），
+ * 外面再包一层 state（{ g, undo, running, startedAt, view }）。两层都要归零。
+ *
+ * **特意不走 startGame()**：那一条第一件事是 G.newGame(n, seed) 重造一张盘，
+ * 等于把题也换了——那不是重开是换题。复位只允许动这一局的痕迹。
+ *
+ * **state.undo 是本仓最容易漏的一样**，理由在 doUndo 自己的注释里：提示改的格也压进
+ * 撤销栈（"提示改的格也要能退"）。所以只清 g.marks 是不够的——玩家按撤销还能把
+ * 走错那半局的线一笔一笔退回来，g.marks 上看着像回到了走错之前的样子。
+ *
+ * g._trace 是铅笔求解的 trace 缓存（给提示用），不清它的话重开后的第一条提示会
+ * 拿着上一局的中间态接着算。
+ */
+function restart() {
+  if (!state) return null;
+  const g = state.g;
+  g.marks.fill(RULES_MOD.UNK);  // 玩家涂的全部抹掉；UNK 从 engine/rules.js 取，
+                                 // 跟 doPaint 的 0/1/2 是同一套口径（见 RULES_MOD 是怎么 import 的）
+  g.sel = -1;                // 选中的格回到"还没选"：重开后第一下键盘操作不会写进一颗看不见选中的格
+  g.flash = -1;              // 上一条提示留下的高亮，属于上一局
+  g.moves = 0;               // 落笔数归零
+  g.hints = 0;               // 提示次数归零：提示要收钱，留着等于让玩家白嫖上一局的帮助
+  g.elapsed = 0;             // 耗时归零
+  g._trace = null;           // 铅笔 trace 缓存：留着会让重开后的第一条提示接着上一局的中间态算
+  state.undo = [];           // 撤销栈全清：提示改的格也压在里面，不清玩家退得回走错那半局
+  state.startedAt = Date.now();  // 时钟重新起跑，重开后的计时是这一局自己的
+  state.running = true;
+  el.veil.hidden = true;     // 结算遮罩收起：上一局赢了的遮罩不能压在重开后的盘上
+  el.hintRule.textContent = '提示理由';
+  el.hintLine.innerHTML = '按 <b>提示</b> 会说出当前能推的一格，以及它依据哪条命名规则。';
+  el.state.textContent = '这一局的涂黑全清空了，题面和盘号没动。';
+  paintAll();
+  persist();                 // 存档覆盖成本局的空盘：刷新页面不会又冒出走错那半局
+  startClock();
+  return g;
+}
+
 function resumeGame(s) {
   const g = G.deserialize(s);
   if (!g) { clearSave(); return false; }
@@ -281,6 +322,9 @@ function handleKey(ev) {
   if (k === '0' || k === 'Backspace') { doPaint(0); ev.preventDefault(); return true; }
   if (k === 'h' || k === 'H') { doHint(); return true; }
   if (k === 'z' || k === 'Z') { doUndo(); return true; }
+  // R 重开本题。本仓原先没有任何键占着 R（方向键走格，Enter/空格落子，B/W/0 涂，
+  // H 提示，Z 撤销，N 换一局），所以不需要挪别的键。局中就能按。
+  if (k === 'r' || k === 'R') { restart(); return true; }
   if (k === 'n' || k === 'N') { startGame(state.g.n, nextSeed()); return true; }
   return false;
 }
@@ -300,6 +344,7 @@ $('#btn-white').addEventListener('click', () => doPaint(1));
 $('#btn-clear').addEventListener('click', () => doPaint(0));
 $('#btn-hint').addEventListener('click', doHint);
 $('#btn-undo').addEventListener('click', doUndo);
+$('#btn-restart').addEventListener('click', restart);
 $('#btn-new').addEventListener('click', () => startGame(state ? state.g.n : TIERS[0].n, nextSeed()));
 $('#btn-menu').addEventListener('click', backToMenu);
 $('#btn-menu-2').addEventListener('click', backToMenu);
@@ -323,6 +368,8 @@ function backToMenu() {
 // 引擎与闸在页面里可达：browser 的 engine 腿就是在真浏览器里跑同一份 ESM。
 window.kurotto = {
   TIERS, EXCLUDED_TIERS, RULES, G,
+  // 挂在窗口上是为了让探针能真的驱动一次重开、读 BEFORE/AFTER，而不必合成点击。
+  restart,
   // 页面里读到的模块图就是出货的那一份：browser 的 engine 腿不再另抄一个求解器，
   // 否则「页面里的引擎过了」和「发布出去的引擎过了」就是两件事。
   engine: { rules: RULES_MOD, pencil: PENCIL_MOD, generate: GEN_MOD, store: STORE_MOD, example: EXAMPLE_MOD },

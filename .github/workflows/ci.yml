@@ -48,6 +48,13 @@ jobs:
       - name: Entry files exist
         run: test -f index.html && grep -q '<canvas' index.html && grep -q 'js/main.js' index.html && grep -q 'kurotto' index.html
 
+      # 上一道闸证明"文档抄的是现在的数"，这一道证明"那些数绿得住"：把每一类谎塞回代码，
+      # 要求对应的断言点名变红。GATE=1 是门禁模式——只打 node 侧的刀（这个 job 没有 Chrome），
+      # 浏览器腿那几把照样逐条预检但延后，并且不回写 README，改为核对 README 那一格等于实测 rc。
+      # 没有 GATE 的整跑是**写台账**的工具：它会把 `?` 填成数字，第二次跑就会因为"那格已经不是 ?"而死。
+      - name: Ledger proves the doc gate can fail
+        run: GATE=1 node tools/sabotage.mjs
+
   # 真浏览器闸：headless Chrome + CDP，读 DOM 文本/几何、画布像素与真实输入事件，不读内部标志位。
   # 独立 job，node 22 而不是 check job 的 20：台架是裸 CDP 驱动，用的是 Node 22 才有的全局
   # WebSocket/fetch；在 20 上第一次 attach 就死在 "WebSocket is not defined"，一条断言都跑不到。

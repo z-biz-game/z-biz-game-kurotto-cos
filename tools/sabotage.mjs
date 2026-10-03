@@ -2,6 +2,19 @@
 //
 // 用法：node tools/sabotage.mjs          跑 README「破坏试验台账」里的全部刀（约 20 分钟）
 //       node tools/sabotage.mjs K1 K11   只跑点名的几把（调试用；回写 README 仍要求整跑全绿）
+//       GATE=1 node tools/sabotage.mjs   门禁模式（CI 与 npm run sabotage 走这条）：
+//         只打 node 侧的刀（engine-test / doctest / balance），浏览器腿那几把**延后**——
+//         check job 里没有 Chrome，打它们会以 rc=2 收场，而那是"没跑起来"不是闸红。
+//         延后不等于放过：那几把照样逐条预检（针唯一命中、期望点名的断言还在闸的源码里），
+//         而且这一格不回写、改为**要求 README 已经写着实测的那个 rc**。
+//         整跑一遍（不给参数）才会把台账里的 `?` 填成实测数；GATE 模式因此必须在整跑之后才跑得绿。
+//         「不带刀整跑四道闸」那一段在 GATE 模式里不重跑：CI 的同一个 job 里 engine-test、doctest、
+//         balance 各自就是一道步骤，把它们再跑一遍等于把同一件事的钱花两次。
+//
+// 为什么要 GATE 模式：这个脚本原本是**写台账的工具**，不是门禁。它每次整跑都回写 README，
+// 于是第二次跑（也就是每一次 push）会因为那一格已经是数字、不再是 `?` 而 die(rc=2)——
+// 直接把 `node tools/sabotage.mjs` 接进 CI 会永久红。GATE 模式把"回写"换成"对账"，
+// 这条闸才既接得进 CI，又不会自己吃掉自己。
 //
 // 为什么要有这个文件：一份全绿的报告只说明"这一轮没有东西坏"，它没说**闸会不会红**。
 // 台账每一行那个 1 必须由脚本把退出码读回来，不能抄。
@@ -47,6 +60,13 @@ const only = process.argv.slice(2);
 const picked = only.length ? knives.filter(k => only.includes(k.id)) : knives;
 if (only.length && picked.length !== only.length) die(`点名的刀有几把不在台账上：${only.filter(x => !picked.some(k => k.id === x)).join(' ')}`);
 
+// GATE=1 是门禁模式（CI / npm run sabotage）。它和整跑的差别只有两处：
+// 浏览器腿的刀延后（check job 没有 Chrome，打它们得到 rc=2，那是"起不来"不是"闸红"），
+// 以及不回写 README、改为核对 README 已写着实测的那个 rc。
+const GATE = process.env.GATE === '1';
+if (GATE && only.length) die('GATE=1 必须整跑：点名的调试跑不能给门禁出分，那样没点名的刀就没人管了');
+const needsChrome = cmd => /verify\.sh/.test(cmd);
+
 // ---- 预检：树必须干净；针唯一命中；期望点名的那条断言得真的写在闸里 ----
 const dirty = git('status --porcelain').out.trim();
 if (dirty) die(`工作树不干净，刀不能打在半成品上（先 commit 或先把这些挪开）：\n${dirty}`);
@@ -72,12 +92,15 @@ for (const k of picked) {
   if (hits !== 1) die(`${k.id} 的针在 ${k.file} 的台账行之外命中 ${hits} 次（必须恰好 1 次；打不中或打多了都不许跑）`);
   if (k.repl === k.needle) die(`${k.id} 的「改成」与针相同，这一刀不会改变任何东西`);
   if (!harness.some(h => h.src.includes(k.expect))) die(`${k.id} 期望点名的「${k.expect}」在任何一道闸的源码里都找不到（断言被改名或删掉了）`);
-  console.log(`  预检 ${k.id} · ${k.file} 针唯一命中 · 期望点名「${k.expect}」`);
+  // 门禁模式的前提是台账已经由一次整跑填过数：还写着 `?` 就说明这一轮的刀根本没打过。
+  if (GATE && !/^\d+$/.test(k.rc)) die(`GATE 模式要求台账每格都是实测回来的数字，${k.id} 那格还是「${k.rc}」`);
+  console.log(`  预检 ${k.id} · ${k.file} 针唯一命中 · 期望点名「${k.expect}」${GATE && needsChrome(k.cmd) ? ' · 浏览器腿：延后' : ''}`);
 }
 
 const timeoutFor = cmd => (/verify\.sh/.test(cmd) ? 1500000 : /balance/.test(cmd) ? 900000 : /doctest/.test(cmd) ? 240000 : 300000);
 const results = [];
 for (const k of picked) {
+  if (GATE && needsChrome(k.cmd)) continue;   // 延后：上面已经逐条预检过，rc 由 README 那格核对
   const src = read(k.file);
   const at = target(src, k.needle);
   if (at.length !== 1) die(`${k.id} 落刀前针的命中数变成 ${at.length} 了（预检之后文件被人改过）`);
@@ -101,7 +124,19 @@ for (const k of picked) {
 
 const bad = results.filter(x => !x.ok);
 if (bad.length) die(`有 ${bad.length} 把刀没红或没点名（${bad.map(x => x.id).join(' ')}）：README 保持原样，不回写任何 rc`);
+if (!results.length) die('一把刀都没打成：台账里的刀全被延后了，那这条门禁就是空转');
 const subset = only.length > 0;
+
+if (GATE) {
+  // 门禁模式不复写文档，而是核对文档那一格等于这台台架刚刚亲口打回来的数。
+  const byId = Object.fromEntries(knives.map(k => [k.id, k]));
+  const drift = results.filter(x => byId[x.id].rc !== String(x.rc));
+  const defer = picked.filter(k => needsChrome(k.cmd));
+  if (drift.length) die(`台账有 ${drift.length} 格和实测不符：${drift.map(x => `${x.id} 文档写 ${byId[x.id].rc}、实测 rc=${x.rc}`).join('，')}`);
+  console.log(`\nGATE：逼红且点名 ${results.length} 把 · 浏览器腿延后 ${defer.length} 把（${defer.map(k => k.id).join(' ')}，仍逐条预检）· 台账核数不符 0 处`);
+  process.exit(0);
+}
+
 if (subset) {
   console.log(`\n点名的调试跑：不跑对照整跑、不回写 README（台账要的是整跑一遍，不给参数才行）。`);
   process.exit(0);

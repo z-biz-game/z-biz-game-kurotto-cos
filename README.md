@@ -145,6 +145,8 @@ LEGS="play win" bash tools/verify.sh  # 单跑几条腿
 GATE_SELFTEST=1 bash tools/verify.sh  # 阴性自证：必须红，且 rc 非 0
 node tools/doctest.mjs                # 文档对账（D1…D13 的等式）
 node tools/sabotage.mjs               # 破坏试验台账：会改文件再恢复，跑之前工作树必须干净
+GATE=1 node tools/sabotage.mjs        # 同一条闸的门禁模式（CI / npm run sabotage 跑的就是这行）：
+                                      # 浏览器腿的刀延后但逐条预检，且不回写本文件、改为核对那格 rc
 npm run check                         # node --check 全树
 ```
 
@@ -162,8 +164,15 @@ npm run check                         # node --check 全树
 | `node tools/engine-test.mjs` | check | `Engine tests` |
 | `node tools/doctest.mjs` | check | `Docs are asserted surface` |
 | `node tools/balance.mjs` | check | `Difficulty ladder is still measured` |
+| `node tools/sabotage.mjs` | check | `Ledger proves the doc gate can fail` |
 | `bash tools/verify.sh` | browser | `Browser gate, both local URL shapes` |
 | `GATE_SELFTEST=1 bash tools/verify.sh` | browser | `Gate proves it can fail` |
+
+CI 那一行跑的是 `GATE=1 node tools/sabotage.mjs`（`npm run sabotage` 是同一个命令）。GATE 是门禁模式，
+和"写台账"的整跑有两处必须的差别：这个 job 没有 Chrome，所以浏览器腿那四把刀（K7–K10）**延后**——
+但它们的针与期望点名照样逐条预检；而且它**不回写本文件**，改为要求本表每一格的 `实测 rc` 等于刚打出来的
+那个数。少了这层区分，把整跑直接接进 CI 会永久红：第二次跑的时候那一格已经是数字、不再是 `?`，
+脚本会按规矩报"不知道该怎么回写"而以 rc=2 死掉。
 
 CI 里没有任何 `npm install`：这仓零运行时依赖，拉一个打包器或浏览器进 CI 只会让门禁输在网络抖动上。
 `check` job 用 node 20，`browser` job 必须 node 22（裸 CDP 台架用的是 22 才有的全局 `WebSocket`）。

@@ -158,8 +158,13 @@ for (const k of picked) {
   const idx = out.indexOf(k.raw);
   if (idx < 0) die(`回写时找不到台账那一行了：${k.id}`);
   const rc = results.find(x => x.id === k.id).rc;
-  const newline = k.raw.replace(/\? \|\s*$/, `${rc} |`);
-  if (newline === k.raw) die(`${k.id} 那一行末尾不是「? |」，不知道该怎么回写：${k.raw.slice(-40)}`);
+  // 台账格既可能是首次的「?」，也可能是上一轮复跑留下的数：两种都要能改写。以前这里只认「?」，
+  // 于是台账在已经被自己回写过一次的树上（也就是定稿的那一版）直接 die——一次性的闸没法复跑，
+  // 更没法证明"这一轮和上一轮是同一个读数"。数不一样时要把「这一行变了」打印出来，而不是悄悄覆盖。
+  const tail = k.raw.match(/([\d?]+) \|\s*$/);
+  if (!tail) die(`${k.id} 那一行末尾不是「<rc> |」，不知道该怎么回写：${k.raw.slice(-40)}`);
+  const newline = k.raw.replace(/([\d?]+) \|\s*$/, `${rc} |`);
+  if (tail[1] !== String(rc)) console.log(`  台账 ${k.id} 的实测 rc 从「${tail[1]}」改成「${rc}」（以本轮实跑为准）`);
   out = out.slice(0, idx) + newline + out.slice(idx + k.raw.length);
 }
 writeFileSync(join(ROOT, readmePath), out);

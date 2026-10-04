@@ -263,7 +263,7 @@ if [ "$SELF" = 1 ]; then
   HIT=$(awk '$2 > 0' "$REPORTS" | wc -l | tr -d ' ')
   echo "  应有 $EXPECTED 份报告，实到 $GOT 份，其中 $HIT 份点名吃下了种下的错"
   if [ "$GOT" != "$EXPECTED" ]; then
-    echo "  RED 阴性自证的报告数对不上：$GOT ≠ $EXPECTED（有腿没跑，或对数表漂了）" >&2
+    echo "  RED 阴性自证的报告数对不上：$GOT ≠ ${EXPECTED}（有腿没跑，或对数表漂了）" >&2
     FAILED=1
   fi
   if [ "$FAILED" = 0 ]; then

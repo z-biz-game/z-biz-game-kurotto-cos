@@ -157,7 +157,10 @@ npm run check                         # node --check 全树
 
 `.github/workflows/ci.yml` 两个 job，`.github/workflows/pages.yml` 发布静态站。
 下表每一行都由 `doctest` 的 D6 拿 `ci.yml` 的 job 正文对账（文档不许比门禁松）；
-样本数那格是 `.github/workflows/ci.yml:46 的 SAMPLES`，D7 会真的起一个 `SAMPLES=3` 的子进程验它接得上。
+样本数那格是 `.github/workflows/ci.yml:43 的 SAMPLES`，D7 会真的起一个 `SAMPLES=3` 的子进程验它接得上。
+（这一处行号刚搬过一次家：`Syntax check every source` 那一步以前自己抄了 3 行 `git ls-files` /
+`node --check`，和本地 `npm run check` 是两份独立漂的抄本；现在两边集合当场量过是 21 对 21，
+那一步只剩 `run: npm run check` 一行，下面的行整体上移，引用跟着改，D9b 会钉住它坐没坐在那一行。）
 
 | 命令 | job | 步骤名 |
 | --- | --- | --- |

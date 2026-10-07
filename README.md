@@ -86,7 +86,7 @@
 | `node tools/engine-test.mjs` | 288 条等式：唯一解、0 猜推满、两路逐格会合、R4 三遍写法对账、计数器 vs 傻跑、seed 跨速度确定性、预算、两路独立性、提示逐格。条数钉在 `tools/engine-test.mjs:272 的 EXPECT_TOTAL` | 它跑在 node 里：页面接线、DOM 文案、画布像素错了它照样绿——那一段归 `core/play/win` 三条腿 |
 | `node tools/balance.mjs` | 四档 × 20 张的实测：等待（B1）、出货率（B2）、阶梯（B3/B3b）、页面数字（B5/B5b）、规则开火（B6）、排除档位（B7）。那条等待线写在 `tools/balance.mjs:43 的 COST_MS` | 它自己从不撒车，所以"多解盘上铅笔不许自称推满"这条要靠 `B4` 自带的那台撒车反面样本机（`B4-guard` 就是数它到底撒了几盘）；难度读数再准也不知道渲染对不对 |
 | `bash tools/verify.sh` | 真 Chrome + 裸 CDP：DOM 文本、几何、画布像素、真输入事件、存档与续局。条数逐份登记在 `tools/verify.sh:82 的 EXPECTS` | 它只认这台 Chrome：别的引擎的字体度量/滚动条不在射程内；也不知道这一盘"难不难"（那是 balance 的话） |
-| `node tools/doctest.mjs` | 本文档与 `DESIGN.md` 里每个"现值"的等式（D1–D14） | 它只比"文档 vs 代码常数 / 脚本现值"，不复测任何墙钟读数；散文里那句"为什么"它管不着——那些理由各自的台架写在 `DESIGN.md §7`。行号引用那一族它按排版现推：文档里印了 6 处 `path:NN` 引用，其中现推锚点 5 条（有一处是同一锚点的重复提及），每一条都要回数被指的那几行里真坐着那个名字，按整词认——名字少抄一个字母也算漂。本仓这 6 处全带名字，所以没有"只过了范围检查、内容没人核"的裸引用；哪天写成裸引用，D14a 那一句会把它算进"不带名字的裸引用 N 处"里点名 |
+| `node tools/doctest.mjs` | 本文档与 `DESIGN.md` 里每个"现值"的等式（D1–D15） | 它只比"文档 vs 代码常数 / 脚本现值"，不复测任何墙钟读数；散文里那句"为什么"它管不着——那些理由各自的台架写在 `DESIGN.md §7`。行号引用那一族它按排版现推：文档里印了 6 处 `path:NN` 引用，其中现推锚点 5 条（有一处是同一锚点的重复提及），每一条都要回数被指的那几行里真坐着那个名字，按整词认——名字少抄一个字母也算漂。本仓这 6 处全带名字，所以没有"只过了范围检查、内容没人核"的裸引用；哪天写成裸引用，D14a 那一句会把它算进"不带名字的裸引用 N 处"里点名 |
 
 浏览器那份逐报告的条数（与 `tools/verify.sh:82 的 EXPECTS` 一格一格相同，闸跑完当场对数）：
 engine 21 / gen 38 / play 30 / hint 16 / win 20 / layout 26 / mouseleg 41 / touchleg 44 / keysleg 26 / save 22 / fragleg 4 / resume 15 / reloadleg 4 / corrupt 16，
@@ -130,7 +130,8 @@ engine 21 / gen 38 / play 30 / hint 16 / win 20 / layout 26 / mouseleg 41 / touc
 | 存档恢复不自动开局、坏档不崩 | `verify.sh:corrupt` · `verify.sh:reloadleg` | 六种坏 payload 任一让页面报错即红 |
 | 触屏与鼠标走的是同一套几何 | `verify.sh:mouseleg` · `verify.sh:touchleg` | 命中盒 / 画布缓冲对不上即红 |
 | 键盘快捷键真的送达 | `verify.sh:keysleg` | 按键后读数没变即红（这条历史上最脆，见「破坏试验台账」） |
-| 本文档里的"现值"等于代码/脚本的现在值 | `D1`–`D14` | 见 `tools/doctest.mjs`，解析不到就红 |
+| CI 跑到的门禁，本地一条命令也跑到 | `D15` | `bash tools/ci.sh` 少任何一步，红字点名「本地入口没跑：……」；每步的 rc 不是 ci.sh 自己捕获的红在 `D15b`，阴性自证那一步被接成正极性、或红了却没人点名的红在 `D15c` |
+| 本文档里的"现值"等于代码/脚本的现在值 | `D1`–`D15` | 见 `tools/doctest.mjs`，解析不到就红 |
 | 「同一个黑块只数一次」「callNodes=5000 比 20000 好」 | 无闸 | 裁断依据写在 `DESIGN.md §7`，不在这里冒充证据 |
 
 ## 复跑
@@ -143,10 +144,11 @@ node tools/balance.mjs 6              # 只想快点看一眼时给小样本：�
 bash tools/verify.sh                  # 真浏览器闸（自己起 server，两条 URL 形态）
 LEGS="play win" bash tools/verify.sh  # 单跑几条腿
 GATE_SELFTEST=1 bash tools/verify.sh  # 阴性自证：必须红，且 rc 非 0
-node tools/doctest.mjs                # 文档对账（D1…D14 的等式）
+node tools/doctest.mjs                # 文档对账（D1…D15 的等式）
 node tools/sabotage.mjs               # 破坏试验台账：会改文件再恢复，跑之前工作树必须干净
 GATE=1 node tools/sabotage.mjs        # 同一条闸的门禁模式（CI / npm run sabotage 跑的就是这行）：
                                       # 浏览器腿的刀延后但逐条预检，且不回写本文件、改为核对那格 rc
+bash tools/ci.sh                      # 本地整闸入口：CI 两个 job 的那十步一次跑齐（含上面两条台账腿）
 npm run check                         # node --check 全树
 ```
 
@@ -178,6 +180,17 @@ CI 那一行跑的是 `GATE=1 node tools/sabotage.mjs`（`npm run sabotage` 是�
 但它们的针与期望点名照样逐条预检；而且它**不回写本文件**，改为要求本表每一格的 `实测 rc` 等于刚打出来的
 那个数。少了这层区分，把整跑直接接进 CI 会永久红：第二次跑的时候那一格已经是数字、不再是 `?`，
 脚本会按规矩报"不知道该怎么回写"而以 rc=2 死掉。
+
+本地这一侧的入口是 `bash tools/ci.sh`（`npm run ci`）。它不是第五道闸——跑的就是上面那张表里的那几步，
+只是把它们接成一条命令：以前本地要按顺序手敲，跳过哪一步就得等 CI 才第一次说话。它自己也不占覆盖表那一格
+（那张表由 D6 与 ci.yml 的 job 正文双向比对，CI 里并没有 `ci.sh` 这一步），比它的是 D15：两边都不许手抄，
+比对集从 `ci.yml` 现读——本仓现读出 7 个 `tools/*` 门禁，本地入口现跑 10 步，多出的三步是 `npm run check`、
+入口文件那一步 grep 和 `GATE_SELFTEST` 阴性自证。每一步的 rc 由 ci.sh 自己捕获、按步写进同一份日志，整闸按
+最坏的一步退出；阴性自证那一步是反极性接的（必须红，且红必须点名是哪条断言吃下了那颗注定错的期望），
+而它只在自己那一份输出里找那句点名——拿总日志去 grep，前一步残留的一条 FAIL 就能替它说话。台账排在 verify
+之前而不是并进 `tools/verify.sh`，是因为 K7–K10 那几把刀改的就是 verify.sh 自己，而 bash 边读边执行：让一个
+还在跑的脚本被自己的台架原地改写，红不红就取决于解析偏移，那种绿不能用。跑之前工作树必须干净：
+`GATE=1 node tools/sabotage.mjs` 拒绝在脏树上打刀，会停在 rc=2。
 
 CI 里没有任何 `npm install`：这仓零运行时依赖，拉一个打包器或浏览器进 CI 只会让门禁输在网络抖动上。
 `check` job 用 node 20，`browser` job 必须 node 22（裸 CDP 台架用的是 22 才有的全局 `WebSocket`）。

@@ -147,7 +147,7 @@ seed 的出货盘：题面哈希与解答哈希必须逐格相同（同一 seed 
 node tools/engine-test.mjs      引擎闸（唯一解 / 0 猜 / 独立性 / 预算 / seed 确定性 / 提示 / 自数）
 node tools/balance.mjs          难度与成本的实测台架（B1…B7）
 bash tools/verify.sh            真浏览器闸（headless Chrome + 裸 CDP，两条 URL 形态）
-node tools/doctest.mjs          文档是被断言的面（D1…D14）
+node tools/doctest.mjs          文档是被断言的面（D1…D15）
 ```
 
 **闸的形状：腿 7 条 · 形态 2 种 · 每形态 14 份报告 · 合计 28 份**（根 `/` 与 Pages 的

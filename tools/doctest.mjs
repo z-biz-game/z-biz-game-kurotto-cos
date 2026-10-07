@@ -498,6 +498,35 @@ ok(aClaim14.length >= 1 && aClaim14.every((v) => v === a14.anchors.length)
   'D14c 文档抄的那两句「印了 N 处 path:NN 引用」「现推锚点 K 条」等于这一次真的推出来的数（每一处都得对，抄错或删掉都红）',
   `文档 ${cClaim14.join('/') || '（解析不到）'} 处引用 / ${aClaim14.join('/') || '（解析不到）'} 条锚点 vs 现推 ${citeTotal14} / ${a14.anchors.length}`);
 
+// ---- D15 本地整闸入口：D6b 从 ci.yml 现读出来的那一步集合，tools/ci.sh 一步都不能少 ----
+// 方向要说清：ci.yml 不跑 ci.sh（CI 自己逐步跑的就是同一批命令），所以这一格不在 D6 那张表里，
+// 它比的是"本地有没有一条命令把 CI 的每一步都跑到"。清单同样不许手抄——ciCommands 是 D6b
+// 从 ci.yml 的正文现读出来的，删掉 CI 的一步，这里的比对集当场跟着缩。
+const CI_SH = existsSync(join(ROOT, 'tools/ci.sh')) ? read('tools/ci.sh') : '';
+const stepLines = CI_SH.split('\n').filter(l => /^run(_must_fail)? \S+ \S/.test(l)).length;
+ok(ciCommands.length >= 6 && CI_SH !== '' && stepLines >= 6,
+  `D15a 两边都真的读到了东西（ci.yml 现读出 ${ciCommands.length} 个 tools 门禁 · ci.sh 里 ${stepLines} 步）`,
+  CI_SH === '' ? 'tools/ci.sh 不在树里' : `门禁 ${ciCommands.join(' / ')} · 本地 ${stepLines} 步`);
+const notLocal = ciCommands.filter(c => !CI_SH.includes(c));
+ok(notLocal.length === 0, 'D15 CI 跑到的每一个 tools 门禁，本地入口也跑（少一步就是那道只在 CI 红、本地没人解释的门）',
+  notLocal.length ? `本地入口没跑：${notLocal.join(' / ')}` : `${ciCommands.length} 个门禁全在本地那一步集合里`);
+// 逐条 rc 必须住在 ci.sh 自己手里：拿"最后一步的 rc"当整闸结论，等于中间九步没人表态。
+ok(/step_rc=\$\?/.test(CI_SH) && /_RC=\$step_rc/.test(CI_SH) && /exit \$FAILED/.test(CI_SH),
+  'D15b ci.sh 自己捕获每一步的 rc、按步写进日志、最后按最坏的那一步退出',
+  `捕获 ${/step_rc=\$\?/.test(CI_SH) ? '在' : '缺'} / 回写 ${/_RC=\$step_rc/.test(CI_SH) ? '在' : '缺'} / 汇总退出 ${/exit \$FAILED/.test(CI_SH) ? '在' : '缺'}`);
+// 阴性自证那一步的极性必须反着接：它注定要红，而且"红了"还得由它自己那一份输出点名是哪条断言。
+ok(/run_must_fail \S+ .*\bGATE_SELFTEST=1 bash tools\/verify\.sh/.test(CI_SH)
+   && /grep -q 'FAIL' "\$LOG\.\$name"/.test(CI_SH),
+  'D15c GATE_SELFTEST 那一步在本地入口里是"必须红"的极性，且只在它自己那一份输出里找点名（拿总日志 grep 会被前一步的 FAIL 替它说话）',
+  `极性反接 ${/run_must_fail \S+ .*\bGATE_SELFTEST=1/.test(CI_SH) ? '在' : '缺'} · 点名搜在本步文件 ${/grep -q 'FAIL' "\$LOG\.\$name"/.test(CI_SH) ? '在' : '缺'}`);
+// 文档抄的那两个数（比对集大小、本地步数）由同一次现读对账：抄错、抄旧、删掉都红。
+const gateClaim15 = (README.match(/(\d+) 个 `tools\/\*` 门禁/) || [])[1];
+const stepClaim15 = (README.match(/本地入口现跑 (\d+) 步/) || [])[1];
+ok(gateClaim15 !== undefined && stepClaim15 !== undefined
+   && +gateClaim15 === ciCommands.length && +stepClaim15 === stepLines,
+  'D15d 文档印的「N 个 tools 门禁」「本地入口现跑 K 步」等于这一次现读出来的两个数',
+  `文档 ${gateClaim15 ?? '（解析不到）'} / ${stepClaim15 ?? '（解析不到）'} vs 现读 ${ciCommands.length} / ${stepLines}`);
+
 // ---- D10c 文档声称的 D 区间 == 这一次真的跑出来的那些标签（自数，防"整节被删"） ----
 const dRanges = [...DOCS.matchAll(/D1[^\d]{1,4}D(\d+)/g)].map(m => +m[1]);
 const dMentions = [...new Set((DOCS.match(/(?<![A-Za-z0-9_])D\d+/g) || []))].map(x => +x.slice(1));

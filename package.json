@@ -10,6 +10,7 @@
     "balance": "node tools/balance.mjs",
     "check": "for f in $(find js tools -type f \\( -name \"*.js\" -o -name \"*.mjs\" -o -name \"*.cjs\" \\) | sort); do node --check \"$f\" || exit 1; done && node --check \"server.cjs\" && echo OK",
     "doctest": "node tools/doctest.mjs",
+    "ci": "bash tools/ci.sh",
     "sabotage": "GATE=1 node tools/sabotage.mjs",
     "deploy-set": "node tools/deploy-set.mjs",
     "deploy-set:selftest": "node tools/deploy-set-selftest.mjs"

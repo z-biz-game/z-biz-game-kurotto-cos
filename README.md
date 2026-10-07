@@ -192,6 +192,11 @@ CI 那一行跑的是 `GATE=1 node tools/sabotage.mjs`（`npm run sabotage` 是�
 还在跑的脚本被自己的台架原地改写，红不红就取决于解析偏移，那种绿不能用。跑之前工作树必须干净：
 `GATE=1 node tools/sabotage.mjs` 拒绝在脏树上打刀，会停在 rc=2。
 
+这条入口本轮在本机跑满过一次，读数在那份默认日志（`ci.sh` 的第一个参数，本轮没传过别的值）里：九步
+`*_RC=0`，反极性那一步 `verify-selftest_RC=1` 且红在自己那一份输出里点到了名，整行 `CI_RC=0`。起停记的是
+14:49:45Z→15:01:56Z，约十二分钟，几乎全在 verify 那两步的 headless Chrome 上——这是本轮这台机器的观测值，
+不是给重跑的承诺，重跑会盖掉那两份日志。
+
 CI 里没有任何 `npm install`：这仓零运行时依赖，拉一个打包器或浏览器进 CI 只会让门禁输在网络抖动上。
 `check` job 用 node 20，`browser` job 必须 node 22（裸 CDP 台架用的是 22 才有的全局 `WebSocket`）。
 

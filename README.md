@@ -232,9 +232,9 @@ CI 与 `npm run sabotage` 跑的是同一张表的 `GATE=1` 那条腿，它报�
 | K11 | 文档抄的逐报告条数与对数表分家 | `README.md` | `engine 21 / gen 38` | `engine 20 / gen 38` | `D8` | `node tools/doctest.mjs` | 1 |
 | K12 | 把耗时印回选档页的按钮上（页面那一头的墙钟回归） | `js/main.js` | `<span class="tier-meta">${t.name} · 实测链长 med ${t.med.rounds} 轮 · 线索 med ${t.med.clues}/${t.n * t.n} 格</span>` | `<span class="tier-meta">${t.name} · 实测链长 med ${t.med.rounds} 轮 · 线索 med ${t.med.clues}/${t.n * t.n} 格 · ${t.med.ms} ms</span>` | `D1f` | `node tools/doctest.mjs` | 1 |
 | K13 | 把按钮文案的锚点改名，让 D1f 无话可说 | `js/main.js` | `class="tier-meta"` | `class="tier-copy"` | `D1f0` | `node tools/doctest.mjs` | 1 |
-| K14 | 本地入口少跑一道 CI 的门：doctest 那一步指向一个不存在的后缀 | `tools/ci.sh` | `run doctest node tools/doctest.mjs` | `run doctest node tools/doctest.bak` | `D15` | `node tools/doctest.mjs` | ? |
-| K15 | 整闸不再按最坏的一步退出（汇总退出那句被改一个字母） | `tools/ci.sh` | `exit $FAILED` | `exit $FAILEx` | `D15b` | `node tools/doctest.mjs` | ? |
-| K16 | 反极性那一步的点名标签拼错，等于没有人在自己那份输出里找那句 FAIL | `tools/ci.sh` | `grep -q 'FAIL' "$LOG.$name"` | `grep -q 'fail' "$LOG.$name"` | `D15c` | `node tools/doctest.mjs` | ? |
+| K14 | 本地入口少跑一道 CI 的门：doctest 那一步指向一个不存在的后缀 | `tools/ci.sh` | `run doctest node tools/doctest.mjs` | `run doctest node tools/doctest.bak` | `D15` | `node tools/doctest.mjs` | 1 |
+| K15 | 整闸不再按最坏的一步退出（汇总退出那句被改一个字母） | `tools/ci.sh` | `exit $FAILED` | `exit $FAILEx` | `D15b` | `node tools/doctest.mjs` | 1 |
+| K16 | 反极性那一步的点名标签拼错，等于没有人在自己那份输出里找那句 FAIL | `tools/ci.sh` | `grep -q 'FAIL' "$LOG.$name"` | `grep -q 'fail' "$LOG.$name"` | `D15c` | `node tools/doctest.mjs` | 1 |
 
 这三把切的是 `tools/ci.sh` 自己，而 `npm run ci` 正在边读边执行这一份文件：所以三把都做成**同字节数、
 同行数**的原地替换（`.mjs`→`.bak`、`FAILED`→`FAILEx`、`FAIL`→`fail`）。只守"不许改行数"还不够——

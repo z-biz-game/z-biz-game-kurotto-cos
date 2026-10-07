@@ -130,7 +130,7 @@ engine 21 / gen 38 / play 30 / hint 16 / win 20 / layout 26 / mouseleg 41 / touc
 | 存档恢复不自动开局、坏档不崩 | `verify.sh:corrupt` · `verify.sh:reloadleg` | 六种坏 payload 任一让页面报错即红 |
 | 触屏与鼠标走的是同一套几何 | `verify.sh:mouseleg` · `verify.sh:touchleg` | 命中盒 / 画布缓冲对不上即红 |
 | 键盘快捷键真的送达 | `verify.sh:keysleg` | 按键后读数没变即红（这条历史上最脆，见「破坏试验台账」） |
-| CI 跑到的门禁，本地一条命令也跑到 | `D15` | `bash tools/ci.sh` 少任何一步，红字点名「本地入口没跑：……」；每步的 rc 不是 ci.sh 自己捕获的红在 `D15b`，阴性自证那一步被接成正极性、或红了却没人点名的红在 `D15c` |
+| CI 跑到的门禁，本地一条命令也跑到 | `D15` | `bash tools/ci.sh` 少任何一步，红字点名「本地入口没跑：……」；每步的 rc 不是 ci.sh 自己捕获的红在 `D15b`，阴性自证那一步被接成正极性、或红了却没人点名的红在 `D15c`。这三条形状各有自己的台账刀（`K14` / `K15` / `K16`，三把都切在 `tools/ci.sh` 自己身上，见台账那张表下面那段） |
 | 本文档里的"现值"等于代码/脚本的现在值 | `D1`–`D15` | 见 `tools/doctest.mjs`，解析不到就红 |
 | 「同一个黑块只数一次」「callNodes=5000 比 20000 好」 | 无闸 | 裁断依据写在 `DESIGN.md §7`，不在这里冒充证据 |
 
@@ -232,6 +232,14 @@ CI 与 `npm run sabotage` 跑的是同一张表的 `GATE=1` 那条腿，它报�
 | K11 | 文档抄的逐报告条数与对数表分家 | `README.md` | `engine 21 / gen 38` | `engine 20 / gen 38` | `D8` | `node tools/doctest.mjs` | 1 |
 | K12 | 把耗时印回选档页的按钮上（页面那一头的墙钟回归） | `js/main.js` | `<span class="tier-meta">${t.name} · 实测链长 med ${t.med.rounds} 轮 · 线索 med ${t.med.clues}/${t.n * t.n} 格</span>` | `<span class="tier-meta">${t.name} · 实测链长 med ${t.med.rounds} 轮 · 线索 med ${t.med.clues}/${t.n * t.n} 格 · ${t.med.ms} ms</span>` | `D1f` | `node tools/doctest.mjs` | 1 |
 | K13 | 把按钮文案的锚点改名，让 D1f 无话可说 | `js/main.js` | `class="tier-meta"` | `class="tier-copy"` | `D1f0` | `node tools/doctest.mjs` | 1 |
+| K14 | 本地入口少跑一道 CI 的门：doctest 那一步指向一个不存在的后缀 | `tools/ci.sh` | `run doctest node tools/doctest.mjs` | `run doctest node tools/doctest.bak` | `D15` | `node tools/doctest.mjs` | ? |
+| K15 | 整闸不再按最坏的一步退出（汇总退出那句被改一个字母） | `tools/ci.sh` | `exit $FAILED` | `exit $FAILEx` | `D15b` | `node tools/doctest.mjs` | ? |
+| K16 | 反极性那一步的点名标签拼错，等于没有人在自己那份输出里找那句 FAIL | `tools/ci.sh` | `grep -q 'FAIL' "$LOG.$name"` | `grep -q 'fail' "$LOG.$name"` | `D15c` | `node tools/doctest.mjs` | ? |
+
+这三把切的是 `tools/ci.sh` 自己，而 `npm run ci` 正在边读边执行这一份文件：所以三把都做成**同字节数、
+同行数**的原地替换（`.mjs`→`.bak`、`FAILED`→`FAILEx`、`FAIL`→`fail`）。只守"不许改行数"还不够——
+行数不动而字节数动了，bash 没读到的那半截照样从中间错位开始解析，那种红与绿都跟闸门无关。跑完台账
+在 `git status` 里应当只剩 README 自己：那份 diff 就是"逐字节还原"的证人。
 
 这里没有一把刀去拆出货前的两道复核（`挖完反而不唯一` / `出货盘铅笔推不满`）：出题器的每道守卫背后还压着下一道，
 拆掉上面那道只会让下一道把盘拦下来，坏盘根本到不了闸面前——这类"拆了照样绿"的刀不是台账的功，它证明的是纵深。

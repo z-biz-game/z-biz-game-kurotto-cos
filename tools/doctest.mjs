@@ -260,19 +260,9 @@ for (const c of cites) {
 ok(cites.length >= 5, `D9a 文档里的行号引用解析到了 ${cites.length || 0} 条（少于 5 条说明引用格式改了）`, `${cites.length} 条`);
 ok(bad.length === 0, 'D9 每一条 path:NN 引用都落在真实文件的行数内',
   bad.length ? `越界：${bad.join('，')}` : `${cites.length} 条全部在范围内`);
-const anchors = [['js/engine/generate.js', 'TIERS'], ['tools/engine-test.mjs', 'EXPECT_TOTAL'], ['tools/balance.mjs', 'COST_MS'],
-  ['tools/verify.sh', 'EXPECTS'], ['.github/workflows/ci.yml', 'SAMPLES']];
-for (const [file, token] of anchors) {
-  const m = DOCS.match(new RegExp(`${file.replace(/[./]/g, '\\$&')}:(\\d+) 的 ${token}\\b`));
-  let detail = '文档没有「' + file + ':NN 的 ' + token + '」这条引用';
-  let hit = false;
-  if (m) {
-    const line = read(file).split('\n')[+m[1] - 1] || '';
-    hit = line.includes(token);
-    detail = `${file}:${m[1]} 那行「${line.trim().slice(0, 58)}」${hit ? '含' : '不含'} ${token}`;
-  }
-  ok(hit, `D9b ${file}:${m ? m[1] : '?'} 真的坐着 ${token}（引用是锚点，不是装饰）`, detail);
-}
+// 这一处原来是一段手抄的 [文件, 名字] 清单（D9b，五对）。它被 D14 取代了：清单只能钉住"抄上去的那
+// 五对"，文档新写一处带名字的引用它看不见，而清单自己抄错一个字母没有任何东西会红。
+// D14 从排版里现推名字，覆盖面是文档的全部引用，而且按整词认（`EXPECT` 少抄一个 S 也会红）。
 const pathMentions = [...new Set((DOCS.match(/(?:tools|js)\/[\w./-]+\.(?:js|mjs|cjs|sh)/g) || []))];
 ok(pathMentions.length >= 8 && pathMentions.every(x => existsSync(join(ROOT, x))),
   `D9c 文档点名的 ${pathMentions.length} 个 tools/ 与 js/ 文件都还在树里（删掉一个工具就得同时删掉提到它的话）`,
@@ -402,6 +392,111 @@ ok(sections.length >= 6 && refs.length >= 8, `D13a DESIGN 有 ${sections.length}
 const dangling = refs.filter(x => !sections.includes(x.n));
 ok(dangling.length === 0, 'D13 每一处「DESIGN.md §N」都指向存在的那一节',
   dangling.length ? `悬空：${dangling.map(x => `${x.where} §${x.n}`).join('，')}` : `${refs.length} 处全部落在 §${sections.join('/')} 里`);
+
+// ---- D14 锚点：那句「第几行的什么名字」坐得对不对（名字从排版里现推，不抄清单） ----
+// D9 的范围腿只问「这个行号在不在文件里」：`x.js:21-25` 写成 `x.js:23-27` 它照绿，两行都存在。
+// D9b 那五对 (文件, 名字) 钉得住"这五处不许漂"，可它是手抄的：文档新写一处带名字的引用它看不见，
+// 清单自己抄错名字也不会红（"抄错"这件事本身没有闸）。这一组不抄清单，名字由排版推出来：
+// 反引号里的 `path:NN[-MM]` 是一张引用，紧挨着它的那个反引号段就是被指的名字（往后看一段，
+// 或往前看一段，中间只许隔「的」「（」这一类连接符，且不许跨行）。锚点的单位是
+// (文件, 起行, 止行, 名字)：同一处被两份文档各写一次只算一条，重复提及另计，
+// 这样"把同一句证据多写一遍"不会把条数自己抬上去。拿不到名字的裸 `path:NN` 这一组一条都不核，
+// 那部分仍只过 D9 的范围检查——这条腿没覆盖什么写在 README 的承诺表下面，不在注释里含糊过去。
+const ANCHOR_CITE = /^([\w./-]+\.(?:js|mjs|cjs|sh|json|html|yml|css)):(\d+)(?:-(\d+))?$/;
+// 本仓的写法是"一整段反引号"：`tools/verify.sh:82 的 EXPECTS`。所以引用段本身就可能带着名字，
+// 先按这种拆，拆不出来再去看相邻的那一段（别的仓写成两段反引号，那种走下面的连接符规则）。
+const ANCHOR_INLINE = /^([\w./-]+\.(?:js|mjs|cjs|sh|json|html|yml|css)):(\d+)(?:-(\d+))?\s*(?:的|::)\s*([^`]+)$/;
+const IDENT = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$/;
+const anchorTok = (body) => {
+  const seg = body.includes('::') ? body.slice(body.lastIndexOf('::') + 2) : body;
+  if (seg.includes('/')) return '';
+  const head = seg.split('(')[0].trim();
+  if (IDENT.test(head)) return head;
+  const lhs = head.split(/[=:]\s/)[0].trim();
+  return IDENT.test(lhs) ? lhs : '';
+};
+const srcLines = new Map();
+const linesOf = (p) => {
+  if (!srcLines.has(p)) {
+    let s = null;
+    try { s = read(p).split('\n'); } catch { s = null; }
+    srcLines.set(p, s);
+  }
+  return srcLines.get(p);
+};
+const deriveAnchors = (text) => {
+  const spans = [...text.matchAll(/`([^`\n]+)`/g)];
+  const out = [];
+  const seen = new Set();
+  let mentions = 0;
+  for (let i = 0; i < spans.length; i += 1) {
+    const plain = ANCHOR_CITE.exec(spans[i][1]);
+    const inline = plain ? null : ANCHOR_INLINE.exec(spans[i][1]);
+    const c = plain || inline;
+    if (!c) continue;
+    let name = inline ? anchorTok(inline[4].trim()) : '';
+    const nxt = spans[i + 1];
+    if (!name && nxt) {
+      const gap = text.slice(spans[i].index + spans[i][0].length, nxt.index);
+      const g = gap.trim();
+      if (gap.length <= 4 && !gap.includes('\n') && (g === '的' || /^[（(]$/.test(g))) name = anchorTok(nxt[1]);
+    }
+    if (!name && i > 0) {
+      const prv = spans[i - 1];
+      const gap = text.slice(prv.index + prv[0].length, spans[i].index);
+      const g = gap.trim();
+      if (gap.length <= 4 && !gap.includes('\n') && !/\s/.test(prv[1]) && /^[（(]/.test(g)) name = anchorTok(prv[1]);
+    }
+    if (!name) continue;
+    mentions += 1;
+    const from = +c[2];
+    const to = +(c[3] || c[2]);
+    const key = `${c[1]}:${from}-${to}:${name}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ file: c[1], from, to, name, label: `${c[1]}:${from}${c[3] ? `-${c[3]}` : ''}` });
+  }
+  return { anchors: out, mentions };
+};
+const anchorDrift = (list) => list.filter((d) => {
+  const s = linesOf(d.file);
+  if (!s) return true;
+  if (d.from < 1 || d.to > s.length) return true;
+  const body = s.slice(d.from - 1, d.to).join('\n');
+  // 按整词认，不按子串认：`EXPECT` 是 `EXPECTS` 的子串，用 includes 的话文档把名字少抄一个字母
+  // 也照样绿——那一处引用其实已经指错了东西。
+  const re = new RegExp(`(^|[^A-Za-z0-9_$])${d.name.replace(/[$.]/g, '\\$&')}($|[^A-Za-z0-9_$])`);
+  return !re.test(body);
+});
+const a14 = deriveAnchors(DOCS);
+const drift14 = anchorDrift(a14.anchors);
+ok(drift14.length === 0, 'D14 从文档现推的每一个锚点都坐在被指的那几行里（行号往旁边挪两行仍然在文件里，范围那条腿看不见这件事）',
+  drift14.length ? `漂 ${drift14.length} 处：${drift14.slice(0, 8).map((d) => `${d.label} 里找不到 ${d.name}`).join('，')}`
+                 : `现推 ${a14.anchors.length} 条（另有 ${a14.mentions - a14.anchors.length} 次是同一处的重复提及），全部落回原处；最窄的八条 ${[...a14.anchors].sort((x, y) => (x.to - x.from) - (y.to - y.from)).slice(0, 8).map((d) => `${d.label}=${d.name}`).join(' ')}`);
+const citeTotal14 = cites.length;
+ok(a14.anchors.length >= 5, 'D14a 现推锚点的条数地板（引用格式改了、或带名字的写法被删光，这一条先红，不给上面那条变成空转绿）',
+  `现推 ${a14.anchors.length} 条 / 文档一共 ${citeTotal14} 处 path:NN 引用，其中 ${citeTotal14 - a14.mentions} 处是不带名字的裸引用`);
+// 阳性对照下在内存里：挑一处带名字的引用把行号整体往下挪两行，同一套比较必须认它漂。
+// 挑不出可挪的那一处（文件太短、或锚点全落在同一行）也算红——那说明这段只是在重抄文档。
+const citeText = (d) => `${d.file}:${d.from}${d.to !== d.from ? `-${d.to}` : ''}`;
+const shiftedText = (d) => `${d.file}:${d.from + 2}${d.to !== d.from ? `-${d.to + 2}` : ''}`;
+const movable14 = [...a14.anchors]
+  .sort((x, y) => (x.to - x.from) - (y.to - y.from))
+  .find((d) => {
+    const text = DOCS.replace(citeText(d), shiftedText(d));
+    return text !== DOCS && anchorDrift(deriveAnchors(text).anchors).length >= 1;
+  });
+ok(!!movable14, 'D14b 内存阳性对照：挑一处带名字的引用把行号往下挪两行，这一套比较必须认它漂（挑不出可挪的就红）',
+  movable14 ? `挪的是 ${citeText(movable14)} 的 ${movable14.name} → ${shiftedText(movable14)}，漂 ${anchorDrift(deriveAnchors(DOCS.replace(citeText(movable14), shiftedText(movable14))).anchors).length} 处`
+            : '一处都挪不动：要么锚点太少，要么这一格已经不会红了');
+// 文档抄的那两个数由同一套推导对账：抄错、抄旧、或者干脆把数字删掉（删掉就等于这一处没人核了），
+// 都在这条上红。`all()` 而不是 `match()`：仓里同一个句子住两处时，第二处不许躲在第一处后面。
+const aClaim14 = [...README.matchAll(/现推锚点 (\d+) 条/g)].map((m) => +m[1]);
+const cClaim14 = [...README.matchAll(/印了 (\d+) 处 `path:NN` 引用/g)].map((m) => +m[1]);
+ok(aClaim14.length >= 1 && aClaim14.every((v) => v === a14.anchors.length)
+   && cClaim14.length >= 1 && cClaim14.every((v) => v === citeTotal14),
+  'D14c 文档抄的那两句「印了 N 处 path:NN 引用」「现推锚点 K 条」等于这一次真的推出来的数（每一处都得对，抄错或删掉都红）',
+  `文档 ${cClaim14.join('/') || '（解析不到）'} 处引用 / ${aClaim14.join('/') || '（解析不到）'} 条锚点 vs 现推 ${citeTotal14} / ${a14.anchors.length}`);
 
 // ---- D10c 文档声称的 D 区间 == 这一次真的跑出来的那些标签（自数，防"整节被删"） ----
 const dRanges = [...DOCS.matchAll(/D1[^\d]{1,4}D(\d+)/g)].map(m => +m[1]);

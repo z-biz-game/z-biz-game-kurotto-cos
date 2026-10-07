@@ -248,18 +248,39 @@ ok(!!totals && perShape === +totals[1], 'D8d 文档列的逐报告条数加起�
 ok(!!totals && perShape * shapes === +totals[2], 'D8e 每形态条数 × 形态数 == 文档写的合计',
   totals ? `${perShape}×${shapes} vs ${totals[2]}` : '解析不到');
 
-// ---- D9 引用不漂：每一条 path:NN 都落在真实行数内，带锚点的还要真指到那个名字 ----
+// ---- D9 引用不漂：每一条 path:NN 都落在真实行数内、且被指的那几行不许整段是空白 ----
 const cites = [...DOCS.matchAll(/((?:\.github\/workflows\/)?[\w./-]+\.(?:js|mjs|cjs|sh|json|html|yml)):(\d+)(?:-(\d+))?/g)];
+// 范围与空行两道查抽进同一个函数，是因为下面那把空行刀要走**同一条代码路径**：把空行那一道从这里删掉，
+// 范围检查照样全绿，只有这一把刀会立刻红——否则新加的那道查就成了一张没有对照的等式。
+const citeMiss = (file, fromRaw, toRaw) => {
+  const label = `${file}:${fromRaw}${toRaw ? '-' + toRaw : ''}`;
+  let src;
+  try { src = read(file); } catch { return `${label}（文件不存在）`; }
+  const lines = src.split('\n');
+  const from = +fromRaw;
+  const to = +(toRaw || fromRaw);
+  if (from > lines.length || to > lines.length) return `${label}（该文件只有 ${lines.length} 行）`;
+  // 「在界内」从来不等于「指到了代码」：一条引用落在 1 与文件行数之间，可能只是指着一片行距。带名字的那条腿
+  // 本来就核不住空行（空行里坐不住任何标识符），所以这一道补的正是裸引用那一格。
+  if (lines.slice(from - 1, to).join('').trim() === '') return `${label} 那几行整段是空行`;
+  return '';
+};
 const bad = [];
 for (const c of cites) {
-  let src;
-  try { src = read(c[1]); } catch { bad.push(`${c[1]}:${c[2]}（文件不存在）`); continue; }
-  const n = src.split('\n').length;
-  if (+c[2] > n || (+c[3] && +c[3] > n)) bad.push(`${c[1]}:${c[2]}${c[3] ? '-' + c[3] : ''}（该文件只有 ${n} 行）`);
+  const miss = citeMiss(c[1], c[2], c[3]);
+  if (miss) bad.push(miss);
 }
+// 反空转的刀：空行靶子由本闸自己那份文件**现量**（第一处整行空白），不写死行号——写死的那个数会在有人把
+// 那一行填上代码之后悄悄地不再测任何东西，`blankAt > 0` 把那一天变成红。
+const selfLines = read('tools/doctest.mjs').split('\n');
+let blankAt = 0;
+for (let i = 1; i < selfLines.length; i += 1) if (selfLines[i].trim() === '') { blankAt = i + 1; break; }
+const blankKnife = blankAt > 0 ? citeMiss('tools/doctest.mjs', blankAt, null) : '';
 ok(cites.length >= 5, `D9a 文档里的行号引用解析到了 ${cites.length || 0} 条（少于 5 条说明引用格式改了）`, `${cites.length} 条`);
-ok(bad.length === 0, 'D9 每一条 path:NN 引用都落在真实文件的行数内',
-  bad.length ? `越界：${bad.join('，')}` : `${cites.length} 条全部在范围内`);
+ok(bad.length === 0 && !!blankKnife, 'D9 每一条 path:NN 引用都落在真实文件的行数内、且被指的那几行整段不许是空行（在界内不等于指到了代码；这一格自己带一把指向空行的刀）',
+  bad.length ? `越界/不存在/空行：${bad.join('，')}`
+    : blankKnife ? `${cites.length} 条全部在范围内 · 刀：第 ${blankAt} 行现量是空行，指过去判红「${blankKnife.split(' ').pop()}」`
+      : `本闸自己的文件里现量不出空行靶子（blankAt=${blankAt}）—— 空行那一道没被证明过`);
 // 这一处原来是一段手抄的 [文件, 名字] 清单（D9b，五对）。它被 D14 取代了：清单只能钉住"抄上去的那
 // 五对"，文档新写一处带名字的引用它看不见，而清单自己抄错一个字母没有任何东西会红。
 // D14 从排版里现推名字，覆盖面是文档的全部引用，而且按整词认（`EXPECT` 少抄一个 S 也会红）。
@@ -401,7 +422,7 @@ ok(dangling.length === 0, 'D13 每一处「DESIGN.md §N」都指向存在的那
 // 或往前看一段，中间只许隔「的」「（」这一类连接符，且不许跨行）。锚点的单位是
 // (文件, 起行, 止行, 名字)：同一处被两份文档各写一次只算一条，重复提及另计，
 // 这样"把同一句证据多写一遍"不会把条数自己抬上去。拿不到名字的裸 `path:NN` 这一组一条都不核，
-// 那部分仍只过 D9 的范围检查——这条腿没覆盖什么写在 README 的承诺表下面，不在注释里含糊过去。
+// 那部分仍只过 D9 的范围与空行这两道——这条腿没覆盖什么写在 README 的承诺表下面，不在注释里含糊过去。
 const ANCHOR_CITE = /^([\w./-]+\.(?:js|mjs|cjs|sh|json|html|yml|css)):(\d+)(?:-(\d+))?$/;
 // 本仓的写法是"一整段反引号"：`tools/verify.sh:82 的 EXPECTS`。所以引用段本身就可能带着名字，
 // 先按这种拆，拆不出来再去看相邻的那一段（别的仓写成两段反引号，那种走下面的连接符规则）。
@@ -470,9 +491,24 @@ const anchorDrift = (list) => list.filter((d) => {
 });
 const a14 = deriveAnchors(DOCS);
 const drift14 = anchorDrift(a14.anchors);
-ok(drift14.length === 0, 'D14 从文档现推的每一个锚点都坐在被指的那几行里（行号往旁边挪两行仍然在文件里，范围那条腿看不见这件事）',
+// 这一格自带一把刀，走的就是上面那条 anchorDrift：把某条现推锚点的名字截掉最后一格，截出来的串仍然是被指
+// 那几行的**子串**、却不再是一个完整标识符（`TIERS` 那一行永远"含" `TIER`）。整词口径必须为它红。口径哪天
+// 退回 `.includes`，那一天正是所有候选都"过"、这把刀挑不出红的日子——所以挑不出就当场红，不许静默跳过。
+const wordKnife = (() => {
+  for (const d of a14.anchors) {
+    const s = linesOf(d.file);
+    if (!s) continue;
+    const body = s.slice(d.from - 1, d.to).join('\n');
+    const cut = d.name.slice(0, -1);
+    if (cut.length < 3 || !/^[A-Za-z0-9_$]+$/.test(cut) || !body.includes(d.name) || !body.includes(cut)) continue;
+    if (anchorDrift([{ ...d, name: cut }]).length) return { d, cut };
+  }
+  return null;
+})();
+ok(drift14.length === 0 && !!wordKnife, 'D14 从文档现推的每一个锚点都作为**完整标识符**坐在被指的那几行里（整词口径，不是子串；行号往旁边挪两行仍然在文件里，范围那条腿看不见这件事，这一格自己带一把截前缀的刀）',
   drift14.length ? `漂 ${drift14.length} 处：${drift14.slice(0, 8).map((d) => `${d.label} 里找不到 ${d.name}`).join('，')}`
-                 : `现推 ${a14.anchors.length} 条（另有 ${a14.mentions - a14.anchors.length} 次是同一处的重复提及），全部落回原处；最窄的八条 ${[...a14.anchors].sort((x, y) => (x.to - x.from) - (y.to - y.from)).slice(0, 8).map((d) => `${d.label}=${d.name}`).join(' ')}`);
+    : wordKnife ? `现推 ${a14.anchors.length} 条（另有 ${a14.mentions - a14.anchors.length} 次是同一处的重复提及），全部落回原处 · 刀：${wordKnife.d.label} 的 ${wordKnife.d.name} 截成 ${wordKnife.cut} 判它「里找不到 ${wordKnife.cut}」`
+      : '现推锚点里截不出前缀靶子 —— 整词这一道没被证明过（口径退回子串的那一天就是这一格红的那一天）');
 const citeTotal14 = cites.length;
 ok(a14.anchors.length >= 5, 'D14a 现推锚点的条数地板（引用格式改了、或带名字的写法被删光，这一条先红，不给上面那条变成空转绿）',
   `现推 ${a14.anchors.length} 条 / 文档一共 ${citeTotal14} 处 path:NN 引用，其中 ${citeTotal14 - a14.mentions} 处是不带名字的裸引用`);

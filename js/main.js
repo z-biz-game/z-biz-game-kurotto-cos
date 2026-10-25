@@ -13,6 +13,10 @@ import { draw, cellAt, cellCenter } from './render/board.js';
 import { loadSave, saveGame, clearSave, loadRecords, recordResult, savePrefs, loadPrefs, wipeAll, storageAvailable, KEYS } from './store.js';
 import * as Theme from './theme.js';
 import { mulberry32 } from './engine/rng.js';
+// 听觉与触觉这两路反馈：视觉与数值之外，桌面上还该有"听得见"的一路。
+// 音频模块自己管手势解锁与真静音（suspend），这里只管把音接到真实事件上。
+import { audio } from './audio.js';
+import { haptics } from './haptics.js';
 
 const $ = s => document.querySelector(s);
 const el = {
@@ -92,7 +96,7 @@ function renderMenu() {
 
 function startGame(n, seed) {
   const g = G.newGame(n, seed);
-  state = { g, undo: [], running: true, startedAt: Date.now(), view: null };
+  state = { g, undo: [], running: true, startedAt: Date.now(), view: null, won: false };
   show('game');
   el.name.textContent = `クロット ${n}×${n}`;
   el.tier.textContent = (TIERS.find(t => t.n === n) || {}).name || '—';
@@ -138,6 +142,7 @@ function restart() {
   state.undo = [];           // 撤销栈全清：提示改的格也压在里面，不清玩家退得回走错那半局
   state.startedAt = Date.now();  // 时钟重新起跑，重开后的计时是这一局自己的
   state.running = true;
+  state.won = false;              // 上一局赢过不算数：这一局还没赢
   el.veil.hidden = true;     // 结算遮罩收起：上一局赢了的遮罩不能压在重开后的盘上
   el.hintRule.textContent = '提示理由';
   el.hintLine.innerHTML = '按 <b>提示</b> 会说出当前能推的一格，以及它依据哪条命名规则。';
@@ -151,7 +156,7 @@ function restart() {
 function resumeGame(s) {
   const g = G.deserialize(s);
   if (!g) { clearSave(); return false; }
-  state = { g, undo: [], running: true, startedAt: Date.now(), view: null };
+  state = { g, undo: [], running: true, startedAt: Date.now(), view: null, won: false };
   show('game');
   el.name.textContent = `クロット ${g.n}×${g.n}`;
   el.tier.textContent = (TIERS.find(t => t.n === g.tier) || {}).name || '—';
@@ -213,6 +218,13 @@ function afterChange() {
 function checkWin() {
   const g = state.g;
   if (!G.isSolved(g)) return false;
+  if (!state.won) {
+    // 只在"从没赢过"到"这一局赢了"的那一下响一次：之后玩家还能在盘上继续涂，
+    // 每涂一下都重播通关声是吵的。
+    state.won = true;
+    audio.play('win');
+    haptics.correct();
+  }
   state.running = false;
   const ms = elapsed();
   g.elapsed = ms;
@@ -237,23 +249,41 @@ function doHint() {
     el.hintLine.textContent = `${r.text} —— 这一格是线索推得出的，不是猜的。`;
   } else {
     el.hintLine.textContent = r.why;
+    audio.play('wrong');
   }
+  audio.play('move');              // 提示：说一格，不代涂
   // 提示改的格也要能退：doUndo 的文案早就这么承诺了，退不掉的那句就是谎。
   if (r.changed) state.undo.push({ i: r.cell, from: r.from });
   afterChange();
 }
 
+// 声音接在这两条落子路径上，因为它们是本仓仅有的两条落子路径：
+//   · 涂黑/涂白/清空（面板按钮与 B/W/0 键都走这里）→ 涂进去了 correct / 没涂进去 wrong
+//   · 点一格在未定/黑/白之间循环（画布上的 pointerdown）→ 同上
+//   · 方向键挪选中格 → move
+//   · 每一格都涂满且账都对上了 → win（在 checkWin 里）
 function doPaint(val) {
   if (!state) return;
   const i = state.g.sel;
-  if (i < 0) { el.state.textContent = '先选一格。'; return; }
+  if (i < 0) {
+    el.state.textContent = '先选一格。';
+    audio.play('wrong');
+    return;
+  }
   if (RULES_MOD.isCircle(state.g.cell[i])) {
     el.state.textContent = '圈格里印着题面的线索，它永远不是黑块 —— 这一格不能涂。';
+    audio.play('wrong');
     return;
   }
   const before = state.g.marks[i];
   const r = G.paint(state.g, i, val);
-  if (r.changed) state.undo.push({ i, from: before });
+  if (r.changed) {
+    state.undo.push({ i, from: before });
+    audio.play('correct');         // 一次有效操作成功：这一格真的改了
+    haptics.correct();
+  } else {
+    audio.play('wrong');           // 涂了个一样的值：什么也没发生
+  }
   afterChange();
 }
 
@@ -262,17 +292,29 @@ function doCycle(i) {
   if (i < 0) return;
   if (RULES_MOD.isCircle(state.g.cell[i])) {
     el.state.textContent = '圈格里印着题面的线索，它永远不是黑块 —— 这一格不能涂。';
+    audio.play('wrong');
     return;
   }
   const before = state.g.marks[i];
   const r = G.cycle(state.g, i);
-  if (r.changed) state.undo.push({ i, from: before });
+  if (r.changed) {
+    state.undo.push({ i, from: before });
+    audio.play('correct');         // 一次有效操作成功：这一格真的改了
+    haptics.correct();
+  } else {
+    audio.play('wrong');
+  }
   afterChange();
 }
 
 function doUndo() {
   const u = state.undo.pop();
-  if (!u) { el.state.textContent = '没有可撤销的一步（提示改的格也在这里退）。'; return; }
+  if (!u) {
+    el.state.textContent = '没有可撤销的一步（提示改的格也在这里退）。';
+    audio.play('wrong');
+    return;
+  }
+  audio.play('move');              // 撤销：盘面退了一步
   state.g.marks[u.i] = u.from;
   state.g.moves++;
   state.g.sel = u.i;
@@ -286,6 +328,7 @@ function moveSel(dr, dc) {
   r = Math.min(g.n - 1, Math.max(0, r + dr));
   c = Math.min(g.n - 1, Math.max(0, c + dc));
   g.sel = r * g.n + c;
+  audio.play('move');              // 光标挪了一格
   paintAll();
 }
 
@@ -510,3 +553,26 @@ if (document.readyState === 'loading') {
 } else {
   bootFullscreen();
 }
+
+// ---- 音效开关（#btn-sound）----
+//
+// 静音走 `audio.setMuted(true)`，那是 `ctx.suspend()`：整个 AudioContext 挂起。
+// **不许**改成像"把 master.gain 拧到 0"那样 —— 只拧 gain 是假静音：节点照建、时钟照跑，
+// 取消静音之后还有一截尾巴在响。真正的静音必须是挂起整个上下文。
+//
+// 按钮找不到就不装（和全屏那一条同一条纪律）：留一串没人按的代码等于没做这个功能。
+(function bindSound() {
+  const btn = document.getElementById('btn-sound');
+  if (!btn) return;
+  function paint() {
+    const on = !audio.muted;
+    btn.setAttribute('aria-pressed', String(on));
+    btn.textContent = on ? '音效：开' : '音效：关';
+    btn.title = on ? '点击关闭音效' : '点击开启音效';
+  }
+  btn.addEventListener('click', () => {
+    audio.setMuted(!audio.muted);
+    paint();
+  });
+  paint();
+})();
